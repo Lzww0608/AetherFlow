@@ -1,0 +1,268 @@
+# AetherFlow Prometheus Alert Rules
+groups:
+  # Quantum Protocol Alerts
+  - name: quantum-protocol
+    interval: 30s
+    rules:
+      - alert: QuantumHighPacketLoss
+        expr: rate(quantum_packets_lost_total[5m]) / rate(quantum_packets_sent_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          component: quantum-protocol
+        annotations:
+          summary: "High packet loss rate detected"
+          description: "Quantum protocol packet loss rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.aetherflow.io/runbooks/quantum-packet-loss"
+
+      - alert: QuantumHighLatency
+        expr: histogram_quantile(0.99, rate(quantum_rtt_seconds_bucket[5m])) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          component: quantum-protocol
+        annotations:
+          summary: "High P99 latency detected"
+          description: "Quantum protocol P99 RTT is {{ $value | humanizeDuration }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.aetherflow.io/runbooks/quantum-latency"
+
+      - alert: QuantumFECRecoveryHigh
+        expr: rate(quantum_fec_recoveries_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: quantum-protocol
+        annotations:
+          summary: "High FEC recovery rate"
+          description: "FEC recovery rate is {{ $value }} recoveries/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.aetherflow.io/runbooks/quantum-fec"
+
+      - alert: QuantumRetransmissionHigh
+        expr: rate(quantum_retransmissions_total[5m]) > 50
+        for: 3m
+        labels:
+          severity: warning
+          component: quantum-protocol
+        annotations:
+          summary: "High retransmission rate"
+          description: "Retransmission rate is {{ $value }} retransmissions/sec on {{ $labels.instance }}"
+
+      - alert: QuantumCongestionWindowStuck
+        expr: quantum_cwnd_bytes == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: quantum-protocol
+        annotations:
+          summary: "Congestion window is zero"
+          description: "BBR congestion window is stuck at zero on {{ $labels.instance }}"
+
+  # Application Performance Alerts
+  - name: application-performance
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: rate(app_errors_total[5m]) / rate(app_requests_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High application error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.service }} on {{ $labels.instance }}"
+
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, rate(app_request_duration_seconds_bucket[5m])) > 1.0
+        for: 2m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High request latency"
+          description: "P95 request latency is {{ $value | humanizeDuration }} for {{ $labels.service }}"
+
+      - alert: TooManyActiveSessions
+        expr: app_active_sessions > 10000
+        for: 5m
+        labels:
+          severity: warning
+          component: session-service
+        annotations:
+          summary: "High number of active sessions"
+          description: "{{ $labels.instance }} has {{ $value }} active sessions"
+
+      - alert: ConcurrentOperationsHigh
+        expr: app_concurrent_operations > 1000
+        for: 3m
+        labels:
+          severity: warning
+          component: statesync-service
+        annotations:
+          summary: "High concurrent operations"
+          description: "{{ $labels.instance }} is processing {{ $value }} concurrent operations"
+
+  # Infrastructure Alerts
+  - name: infrastructure
+    interval: 30s
+    rules:
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: kubernetes
+        annotations:
+          summary: "Pod is crash looping"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+
+      - alert: PodNotReady
+        expr: kube_pod_status_ready{condition="false"} == 1
+        for: 5m
+        labels:
+          severity: warning
+          component: kubernetes
+        annotations:
+          summary: "Pod not ready"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is not ready"
+
+      - alert: DeploymentReplicasMismatch
+        expr: kube_deployment_status_replicas != kube_deployment_spec_replicas
+        for: 5m
+        labels:
+          severity: warning
+          component: kubernetes
+        annotations:
+          summary: "Deployment replicas mismatch"
+          description: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} has {{ $value }} replicas, expected {{ $labels.spec_replicas }}"
+
+      - alert: NodeNotReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: kubernetes
+        annotations:
+          summary: "Node not ready"
+          description: "Node {{ $labels.node }} is not ready"
+
+  # etcd Alerts
+  - name: etcd
+    interval: 30s
+    rules:
+      - alert: EtcdClusterUnhealthy
+        expr: etcd_server_health_success == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: etcd
+        annotations:
+          summary: "etcd cluster unhealthy"
+          description: "etcd instance {{ $labels.instance }} is unhealthy"
+
+      - alert: EtcdHighLatency
+        expr: histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: etcd
+        annotations:
+          summary: "etcd high disk latency"
+          description: "etcd P99 WAL fsync latency is {{ $value | humanizeDuration }} on {{ $labels.instance }}"
+
+      - alert: EtcdLeaderChanges
+        expr: rate(etcd_server_leader_changes_seen_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: etcd
+        annotations:
+          summary: "etcd leader changes detected"
+          description: "etcd cluster has {{ $value }} leader changes in the last 5 minutes"
+
+      - alert: EtcdDatabaseSizeHigh
+        expr: etcd_mvcc_db_total_size_in_bytes > 8 * 1024 * 1024 * 1024  # 8GB
+        for: 5m
+        labels:
+          severity: warning
+          component: etcd
+        annotations:
+          summary: "etcd database size is high"
+          description: "etcd database size is {{ $value | humanizeBytes }} on {{ $labels.instance }}"
+
+      - alert: EtcdNoLeader
+        expr: etcd_server_has_leader == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: etcd
+        annotations:
+          summary: "etcd has no leader"
+          description: "etcd cluster has no leader"
+
+  # Resource Utilization Alerts
+  - name: resource-utilization
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High CPU usage"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} CPU"
+
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High memory usage"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} memory"
+
+      - alert: DiskSpaceHigh
+        expr: (node_filesystem_size_bytes - node_filesystem_avail_bytes) / node_filesystem_size_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High disk usage"
+          description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.instance }} mount {{ $labels.mountpoint }}"
+
+  # HPA Alerts
+  - name: hpa
+    interval: 30s
+    rules:
+      - alert: HPAScalingEvent
+        expr: increase(kube_hpa_status_current_replicas[5m]) > 0 or increase(kube_hpa_status_current_replicas[5m]) < 0
+        for: 0m
+        labels:
+          severity: info
+          component: hpa
+        annotations:
+          summary: "HPA scaling event"
+          description: "HPA {{ $labels.namespace }}/{{ $labels.hpa }} scaled to {{ $labels.current_replicas }} replicas"
+
+      - alert: HPAMaxReplicasReached
+        expr: kube_hpa_status_current_replicas == kube_hpa_spec_max_replicas
+        for: 10m
+        labels:
+          severity: warning
+          component: hpa
+        annotations:
+          summary: "HPA reached maximum replicas"
+          description: "HPA {{ $labels.namespace }}/{{ $labels.hpa }} has reached maximum replicas ({{ $value }})"
+
+      - alert: HPAUnableToScale
+        expr: kube_hpa_status_condition{condition="ScalingActive",status="false"} == 1
+        for: 5m
+        labels:
+          severity: warning
+          component: hpa
+        annotations:
+          summary: "HPA unable to scale"
+          description: "HPA {{ $labels.namespace }}/{{ $labels.hpa }} is unable to scale"

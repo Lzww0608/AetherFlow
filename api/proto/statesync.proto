@@ -1,0 +1,354 @@
+syntax = "proto3";
+
+package aetherflow.statesync.v1;
+
+option go_package = "github.com/aetherflow/aetherflow/api/proto/statesync";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+
+// StateSyncService handles real-time state synchronization
+service StateSyncService {
+  // SyncState synchronizes state changes across clients
+  rpc SyncState(SyncStateRequest) returns (SyncStateResponse);
+  
+  // GetState retrieves current state
+  rpc GetState(GetStateRequest) returns (GetStateResponse);
+  
+  // SubscribeToState establishes a state change subscription
+  rpc SubscribeToState(SubscribeToStateRequest) returns (stream StateChangeEvent);
+  
+  // ApplyOperation applies a collaborative operation
+  rpc ApplyOperation(ApplyOperationRequest) returns (ApplyOperationResponse);
+  
+  // GetOperationHistory retrieves operation history
+  rpc GetOperationHistory(GetOperationHistoryRequest) returns (GetOperationHistoryResponse);
+  
+  // CreateSnapshot creates a state snapshot
+  rpc CreateSnapshot(CreateSnapshotRequest) returns (CreateSnapshotResponse);
+  
+  // RestoreFromSnapshot restores state from a snapshot
+  rpc RestoreFromSnapshot(RestoreFromSnapshotRequest) returns (RestoreFromSnapshotResponse);
+}
+
+// StateObject represents a collaborative object
+message StateObject {
+  // Unique object identifier
+  string object_id = 1;
+  
+  // Object type (document, canvas, etc.)
+  string object_type = 2;
+  
+  // Current version/revision
+  int64 version = 3;
+  
+  // Object data
+  google.protobuf.Any data = 4;
+  
+  // Last modified timestamp
+  google.protobuf.Timestamp last_modified = 5;
+  
+  // Last modifier user ID
+  string last_modifier = 6;
+  
+  // Object metadata
+  map<string, string> metadata = 7;
+  
+  // Access control list
+  repeated AccessControl acl = 8;
+}
+
+// AccessControl defines access permissions
+message AccessControl {
+  // User or group identifier
+  string principal = 1;
+  
+  // Permission type
+  Permission permission = 2;
+}
+
+// Permission types
+enum Permission {
+  PERMISSION_UNSPECIFIED = 0;
+  PERMISSION_READ = 1;
+  PERMISSION_WRITE = 2;
+  PERMISSION_ADMIN = 3;
+}
+
+// Operation represents a collaborative operation
+message Operation {
+  // Unique operation identifier
+  string operation_id = 1;
+  
+  // Target object ID
+  string object_id = 2;
+  
+  // Operation type
+  OperationType type = 3;
+  
+  // Operation data
+  google.protobuf.Any data = 4;
+  
+  // Operation timestamp
+  google.protobuf.Timestamp timestamp = 5;
+  
+  // User who performed the operation
+  string user_id = 6;
+  
+  // Session ID
+  string session_id = 7;
+  
+  // Operation sequence number
+  int64 sequence_number = 8;
+  
+  // Parent operation ID (for conflict resolution)
+  string parent_operation_id = 9;
+  
+  // Quantum protocol trace ID
+  string trace_id = 10;
+}
+
+// OperationType defines types of collaborative operations
+enum OperationType {
+  OPERATION_TYPE_UNSPECIFIED = 0;
+  OPERATION_TYPE_INSERT = 1;
+  OPERATION_TYPE_DELETE = 2;
+  OPERATION_TYPE_UPDATE = 3;
+  OPERATION_TYPE_MOVE = 4;
+  OPERATION_TYPE_TRANSFORM = 5;
+  OPERATION_TYPE_STYLE = 6;
+  OPERATION_TYPE_METADATA = 7;
+}
+
+// SyncStateRequest synchronizes state changes
+message SyncStateRequest {
+  // Target object ID
+  string object_id = 1;
+  
+  // Operations to apply
+  repeated Operation operations = 2;
+  
+  // Client's current version
+  int64 client_version = 3;
+  
+  // Session ID
+  string session_id = 4;
+  
+  // Conflict resolution strategy
+  ConflictResolutionStrategy conflict_strategy = 5;
+}
+
+// ConflictResolutionStrategy defines how to handle conflicts
+enum ConflictResolutionStrategy {
+  CONFLICT_RESOLUTION_STRATEGY_UNSPECIFIED = 0;
+  CONFLICT_RESOLUTION_STRATEGY_LAST_WRITE_WINS = 1;
+  CONFLICT_RESOLUTION_STRATEGY_OPERATIONAL_TRANSFORM = 2;
+  CONFLICT_RESOLUTION_STRATEGY_CRDT = 3;
+  CONFLICT_RESOLUTION_STRATEGY_MANUAL = 4;
+}
+
+// SyncStateResponse returns synchronization results
+message SyncStateResponse {
+  // Updated state object
+  StateObject state_object = 1;
+  
+  // Applied operations
+  repeated Operation applied_operations = 2;
+  
+  // Conflicted operations that need resolution
+  repeated ConflictedOperation conflicted_operations = 3;
+  
+  // Synchronization metadata
+  SyncMetadata sync_metadata = 4;
+}
+
+// ConflictedOperation represents an operation that conflicts
+message ConflictedOperation {
+  // The conflicted operation
+  Operation operation = 1;
+  
+  // Conflicting operations
+  repeated Operation conflicts = 2;
+  
+  // Suggested resolution
+  Operation suggested_resolution = 3;
+  
+  // Conflict reason
+  string conflict_reason = 4;
+}
+
+// SyncMetadata contains synchronization information
+message SyncMetadata {
+  // Server timestamp
+  google.protobuf.Timestamp server_timestamp = 1;
+  
+  // Synchronization latency in milliseconds
+  double sync_latency_ms = 2;
+  
+  // Number of operations processed
+  int32 operations_processed = 3;
+  
+  // Number of conflicts resolved
+  int32 conflicts_resolved = 4;
+  
+  // Quantum protocol performance metrics
+  QuantumMetrics quantum_metrics = 5;
+}
+
+// QuantumMetrics contains Quantum protocol performance data
+message QuantumMetrics {
+  // Round-trip time in milliseconds
+  double rtt_ms = 1;
+  
+  // Packet loss rate
+  double packet_loss_rate = 2;
+  
+  // FEC recovery count
+  int32 fec_recoveries = 3;
+  
+  // Retransmission count
+  int32 retransmissions = 4;
+  
+  // Current congestion window size
+  int32 cwnd_size = 5;
+}
+
+// GetStateRequest retrieves current state
+message GetStateRequest {
+  string object_id = 1;
+  int64 version = 2; // Optional: get specific version
+}
+
+// GetStateResponse returns current state
+message GetStateResponse {
+  StateObject state_object = 1;
+}
+
+// SubscribeToStateRequest establishes state subscription
+message SubscribeToStateRequest {
+  // Object IDs to subscribe to
+  repeated string object_ids = 1;
+  
+  // Session ID
+  string session_id = 2;
+  
+  // Subscription filters
+  repeated SubscriptionFilter filters = 3;
+}
+
+// SubscriptionFilter defines subscription criteria
+message SubscriptionFilter {
+  // Filter type
+  FilterType type = 1;
+  
+  // Filter value
+  string value = 2;
+}
+
+// FilterType defines filter types
+enum FilterType {
+  FILTER_TYPE_UNSPECIFIED = 0;
+  FILTER_TYPE_OPERATION_TYPE = 1;
+  FILTER_TYPE_USER_ID = 2;
+  FILTER_TYPE_OBJECT_TYPE = 3;
+  FILTER_TYPE_METADATA_KEY = 4;
+}
+
+// StateChangeEvent represents a state change notification
+message StateChangeEvent {
+  // Event type
+  EventType event_type = 1;
+  
+  // Target object ID
+  string object_id = 2;
+  
+  // Applied operation
+  Operation operation = 3;
+  
+  // Updated state object (for full updates)
+  StateObject state_object = 4;
+  
+  // Event timestamp
+  google.protobuf.Timestamp timestamp = 5;
+  
+  // Event metadata
+  map<string, string> metadata = 6;
+}
+
+// EventType defines state change event types
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_OPERATION_APPLIED = 1;
+  EVENT_TYPE_STATE_UPDATED = 2;
+  EVENT_TYPE_OBJECT_CREATED = 3;
+  EVENT_TYPE_OBJECT_DELETED = 4;
+  EVENT_TYPE_CONFLICT_DETECTED = 5;
+  EVENT_TYPE_SNAPSHOT_CREATED = 6;
+}
+
+// ApplyOperationRequest applies a single operation
+message ApplyOperationRequest {
+  Operation operation = 1;
+  string session_id = 2;
+  ConflictResolutionStrategy conflict_strategy = 3;
+}
+
+// ApplyOperationResponse returns operation result
+message ApplyOperationResponse {
+  bool success = 1;
+  Operation applied_operation = 2;
+  repeated ConflictedOperation conflicts = 3;
+  SyncMetadata sync_metadata = 4;
+}
+
+// GetOperationHistoryRequest retrieves operation history
+message GetOperationHistoryRequest {
+  string object_id = 1;
+  int64 from_version = 2;
+  int64 to_version = 3;
+  int32 limit = 4;
+}
+
+// GetOperationHistoryResponse returns operation history
+message GetOperationHistoryResponse {
+  repeated Operation operations = 1;
+  bool has_more = 2;
+  string next_cursor = 3;
+}
+
+// CreateSnapshotRequest creates a state snapshot
+message CreateSnapshotRequest {
+  string object_id = 1;
+  string snapshot_name = 2;
+  map<string, string> metadata = 3;
+}
+
+// CreateSnapshotResponse returns snapshot information
+message CreateSnapshotResponse {
+  Snapshot snapshot = 1;
+}
+
+// Snapshot represents a state snapshot
+message Snapshot {
+  string snapshot_id = 1;
+  string object_id = 2;
+  string name = 3;
+  int64 version = 4;
+  google.protobuf.Timestamp created_at = 5;
+  string created_by = 6;
+  map<string, string> metadata = 7;
+  int64 size_bytes = 8;
+}
+
+// RestoreFromSnapshotRequest restores from snapshot
+message RestoreFromSnapshotRequest {
+  string snapshot_id = 1;
+  string session_id = 2;
+}
+
+// RestoreFromSnapshotResponse returns restoration result
+message RestoreFromSnapshotResponse {
+  bool success = 1;
+  StateObject restored_state = 2;
+  string message = 3;
+}

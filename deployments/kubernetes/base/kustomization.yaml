@@ -1,0 +1,92 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: aetherflow-base
+
+namespace: aetherflow-system
+
+resources:
+  # Core Services
+  - api-gateway-deployment.yaml
+  - api-gateway-service.yaml
+  - session-service-deployment.yaml
+  - session-service-service.yaml
+  - statesync-service-deployment.yaml
+  - statesync-service-service.yaml
+  
+  # etcd Cluster
+  - etcd-statefulset.yaml
+  - etcd-service.yaml
+  - etcd-configmap.yaml
+  
+  # Monitoring Stack
+  - prometheus-deployment.yaml
+  - prometheus-service.yaml
+  - prometheus-configmap.yaml
+  - grafana-deployment.yaml
+  - grafana-service.yaml
+  - grafana-configmap.yaml
+  - alertmanager-deployment.yaml
+  - alertmanager-service.yaml
+  - alertmanager-configmap.yaml
+  
+  # HPA Resources
+  - session-service-hpa.yaml
+  - statesync-service-hpa.yaml
+  
+  # RBAC
+  - rbac.yaml
+  
+  # Network Policies
+  - network-policies.yaml
+  
+  # ConfigMaps and Secrets
+  - quantum-config-configmap.yaml
+  - app-secrets.yaml
+
+commonLabels:
+  app.kubernetes.io/name: aetherflow
+  app.kubernetes.io/version: v1.0.0
+  app.kubernetes.io/component: microservice
+  app.kubernetes.io/part-of: aetherflow-system
+
+commonAnnotations:
+  aetherflow.io/managed-by: kustomize
+  aetherflow.io/protocol: quantum
+
+images:
+  - name: aetherflow/api-gateway
+    newTag: v1.0.0
+  - name: aetherflow/session-service
+    newTag: v1.0.0
+  - name: aetherflow/statesync-service
+    newTag: v1.0.0
+
+configMapGenerator:
+  - name: quantum-protocol-config
+    literals:
+      - fec-ratio=0.3
+      - bbr-startup-gain=2.77
+      - max-cwnd=65536
+      - heartbeat-interval=30
+      - max-retries=3
+      - packet-timeout=100ms
+      - connection-timeout=30s
+
+secretGenerator:
+  - name: jwt-secret
+    literals:
+      - jwt-secret-key=your-super-secret-jwt-key-change-in-production
+  - name: etcd-auth
+    literals:
+      - username=aetherflow
+      - password=change-in-production
+
+replicas:
+  - name: api-gateway-deployment
+    count: 3
+  - name: session-service-deployment
+    count: 3
+  - name: statesync-service-deployment
+    count: 3

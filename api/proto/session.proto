@@ -1,0 +1,221 @@
+syntax = "proto3";
+
+package aetherflow.session.v1;
+
+option go_package = "github.com/aetherflow/aetherflow/api/proto/session";
+
+import "google/protobuf/timestamp.proto";
+
+// SessionService manages user sessions and connection lifecycle
+service SessionService {
+  // CreateSession establishes a new user session
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+  
+  // GetSession retrieves session information
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  
+  // UpdateSession updates session metadata
+  rpc UpdateSession(UpdateSessionRequest) returns (UpdateSessionResponse);
+  
+  // DestroySession terminates a session
+  rpc DestroySession(DestroySessionRequest) returns (DestroySessionResponse);
+  
+  // Heartbeat maintains session liveness
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  
+  // ListActiveSessions returns all active sessions
+  rpc ListActiveSessions(ListActiveSessionsRequest) returns (ListActiveSessionsResponse);
+}
+
+// Session represents a user session
+message Session {
+  // Unique session identifier
+  string session_id = 1;
+  
+  // User identifier
+  string user_id = 2;
+  
+  // Client information
+  ClientInfo client_info = 3;
+  
+  // Session creation timestamp
+  google.protobuf.Timestamp created_at = 4;
+  
+  // Last activity timestamp
+  google.protobuf.Timestamp last_activity = 5;
+  
+  // Session metadata
+  map<string, string> metadata = 6;
+  
+  // Connection status
+  ConnectionStatus status = 7;
+  
+  // Quantum protocol connection ID (GUUID)
+  string quantum_connection_id = 8;
+}
+
+// ClientInfo contains client-specific information
+message ClientInfo {
+  // Client IP address
+  string ip_address = 1;
+  
+  // User agent string
+  string user_agent = 2;
+  
+  // Client platform (web, mobile, desktop)
+  string platform = 3;
+  
+  // Client version
+  string version = 4;
+  
+  // Additional client metadata
+  map<string, string> metadata = 5;
+}
+
+// ConnectionStatus represents the current connection state
+enum ConnectionStatus {
+  CONNECTION_STATUS_UNSPECIFIED = 0;
+  CONNECTION_STATUS_CONNECTING = 1;
+  CONNECTION_STATUS_ACTIVE = 2;
+  CONNECTION_STATUS_IDLE = 3;
+  CONNECTION_STATUS_DISCONNECTED = 4;
+  CONNECTION_STATUS_ERROR = 5;
+}
+
+// CreateSessionRequest creates a new session
+message CreateSessionRequest {
+  // User identifier
+  string user_id = 1;
+  
+  // Client information
+  ClientInfo client_info = 2;
+  
+  // Initial session metadata
+  map<string, string> metadata = 3;
+  
+  // Authentication token
+  string auth_token = 4;
+}
+
+// CreateSessionResponse returns the created session
+message CreateSessionResponse {
+  // Created session
+  Session session = 1;
+  
+  // Quantum protocol endpoint information
+  QuantumEndpoint quantum_endpoint = 2;
+}
+
+// QuantumEndpoint provides connection details for Quantum protocol
+message QuantumEndpoint {
+  // Server address
+  string address = 1;
+  
+  // Server port
+  int32 port = 2;
+  
+  // Connection ID (GUUID)
+  string connection_id = 3;
+  
+  // Connection parameters
+  QuantumConnectionParams params = 4;
+}
+
+// QuantumConnectionParams contains Quantum protocol parameters
+message QuantumConnectionParams {
+  // Initial congestion window size
+  int32 initial_cwnd = 1;
+  
+  // FEC ratio (0.0 to 1.0)
+  float fec_ratio = 2;
+  
+  // Maximum retransmission attempts
+  int32 max_retries = 3;
+  
+  // Heartbeat interval in seconds
+  int32 heartbeat_interval = 4;
+}
+
+// GetSessionRequest retrieves session information
+message GetSessionRequest {
+  string session_id = 1;
+}
+
+// GetSessionResponse returns session information
+message GetSessionResponse {
+  Session session = 1;
+}
+
+// UpdateSessionRequest updates session metadata
+message UpdateSessionRequest {
+  string session_id = 1;
+  map<string, string> metadata = 2;
+  ConnectionStatus status = 3;
+}
+
+// UpdateSessionResponse confirms session update
+message UpdateSessionResponse {
+  Session session = 1;
+}
+
+// DestroySessionRequest terminates a session
+message DestroySessionRequest {
+  string session_id = 1;
+  string reason = 2;
+}
+
+// DestroySessionResponse confirms session termination
+message DestroySessionResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// HeartbeatRequest maintains session liveness
+message HeartbeatRequest {
+  string session_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  
+  // Optional performance metrics
+  PerformanceMetrics metrics = 3;
+}
+
+// PerformanceMetrics contains client-side performance data
+message PerformanceMetrics {
+  // Round-trip time in milliseconds
+  double rtt_ms = 1;
+  
+  // Packet loss rate (0.0 to 1.0)
+  double packet_loss_rate = 2;
+  
+  // Bandwidth utilization in bytes per second
+  int64 bandwidth_bps = 3;
+  
+  // Number of active connections
+  int32 active_connections = 4;
+}
+
+// HeartbeatResponse acknowledges heartbeat
+message HeartbeatResponse {
+  bool success = 1;
+  google.protobuf.Timestamp server_timestamp = 2;
+  
+  // Updated connection parameters if needed
+  QuantumConnectionParams updated_params = 3;
+}
+
+// ListActiveSessionsRequest lists all active sessions
+message ListActiveSessionsRequest {
+  // Optional user filter
+  string user_id = 1;
+  
+  // Pagination
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+// ListActiveSessionsResponse returns active sessions
+message ListActiveSessionsResponse {
+  repeated Session sessions = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
