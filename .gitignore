@@ -23,6 +23,14 @@ dist/
 # Go模块缓存（通常不需要上传）
 go.sum
 
+# Go构建缓存目录
+.gocache/
+go-build/
+cache/
+
+# Go下载的包缓存
+go/pkg/mod/
+
 # 依赖vendor目录（如果使用vendor模式）
 vendor/
 
