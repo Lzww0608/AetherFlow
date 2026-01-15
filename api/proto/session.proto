@@ -1,221 +1,224 @@
 syntax = "proto3";
 
-package aetherflow.session.v1;
+package session;
 
 option go_package = "github.com/aetherflow/aetherflow/api/proto/session";
 
 import "google/protobuf/timestamp.proto";
 
-// SessionService manages user sessions and connection lifecycle
+// SessionService 提供用户会话和连接管理功能
 service SessionService {
-  // CreateSession establishes a new user session
+  // CreateSession 创建新的用户会话
   rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
   
-  // GetSession retrieves session information
+  // GetSession 获取会话信息
   rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
   
-  // UpdateSession updates session metadata
+  // UpdateSession 更新会话状态
   rpc UpdateSession(UpdateSessionRequest) returns (UpdateSessionResponse);
   
-  // DestroySession terminates a session
-  rpc DestroySession(DestroySessionRequest) returns (DestroySessionResponse);
+  // DeleteSession 删除会话
+  rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
   
-  // Heartbeat maintains session liveness
+  // ListSessions 列出所有活跃会话
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  
+  // Heartbeat 会话心跳保活
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
-  
-  // ListActiveSessions returns all active sessions
-  rpc ListActiveSessions(ListActiveSessionsRequest) returns (ListActiveSessionsResponse);
 }
 
-// Session represents a user session
+// Session 表示一个用户会话
 message Session {
-  // Unique session identifier
+  // 会话ID（使用UUIDv7）
   string session_id = 1;
   
-  // User identifier
+  // 用户ID
   string user_id = 2;
   
-  // Client information
-  ClientInfo client_info = 3;
-  
-  // Session creation timestamp
-  google.protobuf.Timestamp created_at = 4;
-  
-  // Last activity timestamp
-  google.protobuf.Timestamp last_activity = 5;
-  
-  // Session metadata
-  map<string, string> metadata = 6;
-  
-  // Connection status
-  ConnectionStatus status = 7;
-  
-  // Quantum protocol connection ID (GUUID)
-  string quantum_connection_id = 8;
-}
-
-// ClientInfo contains client-specific information
-message ClientInfo {
-  // Client IP address
-  string ip_address = 1;
-  
-  // User agent string
-  string user_agent = 2;
-  
-  // Client platform (web, mobile, desktop)
-  string platform = 3;
-  
-  // Client version
-  string version = 4;
-  
-  // Additional client metadata
-  map<string, string> metadata = 5;
-}
-
-// ConnectionStatus represents the current connection state
-enum ConnectionStatus {
-  CONNECTION_STATUS_UNSPECIFIED = 0;
-  CONNECTION_STATUS_CONNECTING = 1;
-  CONNECTION_STATUS_ACTIVE = 2;
-  CONNECTION_STATUS_IDLE = 3;
-  CONNECTION_STATUS_DISCONNECTED = 4;
-  CONNECTION_STATUS_ERROR = 5;
-}
-
-// CreateSessionRequest creates a new session
-message CreateSessionRequest {
-  // User identifier
-  string user_id = 1;
-  
-  // Client information
-  ClientInfo client_info = 2;
-  
-  // Initial session metadata
-  map<string, string> metadata = 3;
-  
-  // Authentication token
-  string auth_token = 4;
-}
-
-// CreateSessionResponse returns the created session
-message CreateSessionResponse {
-  // Created session
-  Session session = 1;
-  
-  // Quantum protocol endpoint information
-  QuantumEndpoint quantum_endpoint = 2;
-}
-
-// QuantumEndpoint provides connection details for Quantum protocol
-message QuantumEndpoint {
-  // Server address
-  string address = 1;
-  
-  // Server port
-  int32 port = 2;
-  
-  // Connection ID (GUUID)
+  // 连接ID（Quantum协议的GUUID）
   string connection_id = 3;
   
-  // Connection parameters
-  QuantumConnectionParams params = 4;
+  // 客户端IP地址
+  string client_ip = 4;
+  
+  // 客户端端口
+  uint32 client_port = 5;
+  
+  // 服务端地址
+  string server_addr = 6;
+  
+  // 会话状态
+  SessionState state = 7;
+  
+  // 创建时间
+  google.protobuf.Timestamp created_at = 8;
+  
+  // 最后活跃时间
+  google.protobuf.Timestamp last_active_at = 9;
+  
+  // 过期时间
+  google.protobuf.Timestamp expires_at = 10;
+  
+  // 客户端元数据
+  map<string, string> metadata = 11;
+  
+  // 会话统计信息
+  SessionStats stats = 12;
 }
 
-// QuantumConnectionParams contains Quantum protocol parameters
-message QuantumConnectionParams {
-  // Initial congestion window size
-  int32 initial_cwnd = 1;
-  
-  // FEC ratio (0.0 to 1.0)
-  float fec_ratio = 2;
-  
-  // Maximum retransmission attempts
-  int32 max_retries = 3;
-  
-  // Heartbeat interval in seconds
-  int32 heartbeat_interval = 4;
+// SessionState 会话状态枚举
+enum SessionState {
+  SESSION_STATE_UNSPECIFIED = 0;
+  SESSION_STATE_CONNECTING = 1;   // 连接中
+  SESSION_STATE_ACTIVE = 2;       // 活跃
+  SESSION_STATE_IDLE = 3;         // 空闲
+  SESSION_STATE_DISCONNECTING = 4; // 断开中
+  SESSION_STATE_CLOSED = 5;       // 已关闭
 }
 
-// GetSessionRequest retrieves session information
+// SessionStats 会话统计信息
+message SessionStats {
+  // 发送的数据包数量
+  uint64 packets_sent = 1;
+  
+  // 接收的数据包数量
+  uint64 packets_received = 2;
+  
+  // 发送的字节数
+  uint64 bytes_sent = 3;
+  
+  // 接收的字节数
+  uint64 bytes_received = 4;
+  
+  // 重传次数
+  uint64 retransmissions = 5;
+  
+  // 当前RTT（毫秒）
+  uint32 current_rtt_ms = 6;
+}
+
+// CreateSessionRequest 创建会话请求
+message CreateSessionRequest {
+  // 用户ID
+  string user_id = 1;
+  
+  // 客户端IP
+  string client_ip = 2;
+  
+  // 客户端端口
+  uint32 client_port = 3;
+  
+  // 客户端元数据
+  map<string, string> metadata = 4;
+  
+  // 会话超时时间（秒）
+  uint32 timeout_seconds = 5;
+}
+
+// CreateSessionResponse 创建会话响应
+message CreateSessionResponse {
+  // 创建的会话
+  Session session = 1;
+  
+  // 连接令牌（用于后续认证）
+  string token = 2;
+}
+
+// GetSessionRequest 获取会话请求
 message GetSessionRequest {
+  // 会话ID
   string session_id = 1;
 }
 
-// GetSessionResponse returns session information
+// GetSessionResponse 获取会话响应
 message GetSessionResponse {
+  // 会话信息
   Session session = 1;
 }
 
-// UpdateSessionRequest updates session metadata
+// UpdateSessionRequest 更新会话请求
 message UpdateSessionRequest {
+  // 会话ID
   string session_id = 1;
-  map<string, string> metadata = 2;
-  ConnectionStatus status = 3;
+  
+  // 新的状态（可选）
+  SessionState state = 2;
+  
+  // 更新的元数据（可选）
+  map<string, string> metadata = 3;
+  
+  // 更新统计信息（可选）
+  SessionStats stats = 4;
 }
 
-// UpdateSessionResponse confirms session update
+// UpdateSessionResponse 更新会话响应
 message UpdateSessionResponse {
+  // 更新后的会话
   Session session = 1;
 }
 
-// DestroySessionRequest terminates a session
-message DestroySessionRequest {
+// DeleteSessionRequest 删除会话请求
+message DeleteSessionRequest {
+  // 会话ID
   string session_id = 1;
+  
+  // 删除原因
   string reason = 2;
 }
 
-// DestroySessionResponse confirms session termination
-message DestroySessionResponse {
+// DeleteSessionResponse 删除会话响应
+message DeleteSessionResponse {
+  // 是否成功
   bool success = 1;
-  string message = 2;
 }
 
-// HeartbeatRequest maintains session liveness
-message HeartbeatRequest {
-  string session_id = 1;
-  google.protobuf.Timestamp timestamp = 2;
-  
-  // Optional performance metrics
-  PerformanceMetrics metrics = 3;
-}
-
-// PerformanceMetrics contains client-side performance data
-message PerformanceMetrics {
-  // Round-trip time in milliseconds
-  double rtt_ms = 1;
-  
-  // Packet loss rate (0.0 to 1.0)
-  double packet_loss_rate = 2;
-  
-  // Bandwidth utilization in bytes per second
-  int64 bandwidth_bps = 3;
-  
-  // Number of active connections
-  int32 active_connections = 4;
-}
-
-// HeartbeatResponse acknowledges heartbeat
-message HeartbeatResponse {
-  bool success = 1;
-  google.protobuf.Timestamp server_timestamp = 2;
-  
-  // Updated connection parameters if needed
-  QuantumConnectionParams updated_params = 3;
-}
-
-// ListActiveSessionsRequest lists all active sessions
-message ListActiveSessionsRequest {
-  // Optional user filter
+// ListSessionsRequest 列出会话请求
+message ListSessionsRequest {
+  // 用户ID过滤（可选）
   string user_id = 1;
   
-  // Pagination
-  int32 page_size = 2;
-  string page_token = 3;
+  // 状态过滤（可选）
+  SessionState state = 2;
+  
+  // 分页：页码
+  uint32 page = 3;
+  
+  // 分页：每页数量
+  uint32 page_size = 4;
 }
 
-// ListActiveSessionsResponse returns active sessions
-message ListActiveSessionsResponse {
+// ListSessionsResponse 列出会话响应
+message ListSessionsResponse {
+  // 会话列表
   repeated Session sessions = 1;
-  string next_page_token = 2;
-  int32 total_count = 3;
+  
+  // 总数
+  uint32 total = 2;
+  
+  // 当前页
+  uint32 page = 3;
+  
+  // 每页数量
+  uint32 page_size = 4;
+}
+
+// HeartbeatRequest 心跳请求
+message HeartbeatRequest {
+  // 会话ID
+  string session_id = 1;
+  
+  // 客户端时间戳
+  google.protobuf.Timestamp client_timestamp = 2;
+}
+
+// HeartbeatResponse 心跳响应
+message HeartbeatResponse {
+  // 是否成功
+  bool success = 1;
+  
+  // 服务器时间戳
+  google.protobuf.Timestamp server_timestamp = 2;
+  
+  // 会话剩余有效时间（秒）
+  uint32 remaining_seconds = 3;
 }
