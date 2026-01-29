@@ -1,354 +1,274 @@
 syntax = "proto3";
 
-package aetherflow.statesync.v1;
-
-option go_package = "github.com/aetherflow/aetherflow/api/proto/statesync";
+package aetherflow.statesync;
 
 import "google/protobuf/timestamp.proto";
-import "google/protobuf/any.proto";
 
-// StateSyncService handles real-time state synchronization
+option go_package = "github.com/aetherflow/api/proto/statesync;statesync";
+
+// StateSyncService 状态同步服务
 service StateSyncService {
-  // SyncState synchronizes state changes across clients
-  rpc SyncState(SyncStateRequest) returns (SyncStateResponse);
-  
-  // GetState retrieves current state
-  rpc GetState(GetStateRequest) returns (GetStateResponse);
-  
-  // SubscribeToState establishes a state change subscription
-  rpc SubscribeToState(SubscribeToStateRequest) returns (stream StateChangeEvent);
-  
-  // ApplyOperation applies a collaborative operation
+  // 文档管理
+  rpc CreateDocument(CreateDocumentRequest) returns (CreateDocumentResponse);
+  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse);
+  rpc UpdateDocument(UpdateDocumentRequest) returns (UpdateDocumentResponse);
+  rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
+  rpc ListDocuments(ListDocumentsRequest) returns (ListDocumentsResponse);
+
+  // 操作管理
   rpc ApplyOperation(ApplyOperationRequest) returns (ApplyOperationResponse);
-  
-  // GetOperationHistory retrieves operation history
   rpc GetOperationHistory(GetOperationHistoryRequest) returns (GetOperationHistoryResponse);
-  
-  // CreateSnapshot creates a state snapshot
-  rpc CreateSnapshot(CreateSnapshotRequest) returns (CreateSnapshotResponse);
-  
-  // RestoreFromSnapshot restores state from a snapshot
-  rpc RestoreFromSnapshot(RestoreFromSnapshotRequest) returns (RestoreFromSnapshotResponse);
+
+  // 订阅管理  
+  rpc SubscribeDocument(SubscribeDocumentRequest) returns (stream OperationEvent);
+  rpc UnsubscribeDocument(UnsubscribeDocumentRequest) returns (UnsubscribeDocumentResponse);
+
+  // 锁管理
+  rpc AcquireLock(AcquireLockRequest) returns (AcquireLockResponse);
+  rpc ReleaseLock(ReleaseLockRequest) returns (ReleaseLockResponse);
+  rpc IsLocked(IsLockedRequest) returns (IsLockedResponse);
+
+  // 统计信息
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
 }
 
-// StateObject represents a collaborative object
-message StateObject {
-  // Unique object identifier
-  string object_id = 1;
-  
-  // Object type (document, canvas, etc.)
-  string object_type = 2;
-  
-  // Current version/revision
-  int64 version = 3;
-  
-  // Object data
-  google.protobuf.Any data = 4;
-  
-  // Last modified timestamp
-  google.protobuf.Timestamp last_modified = 5;
-  
-  // Last modifier user ID
-  string last_modifier = 6;
-  
-  // Object metadata
-  map<string, string> metadata = 7;
-  
-  // Access control list
-  repeated AccessControl acl = 8;
+// ==================== 文档相关消息 ====================
+
+message Document {
+  string id = 1;
+  string name = 2;
+  string type = 3;  // whiteboard, text, canvas, sheet
+  string state = 4; // active, archived, deleted
+  uint64 version = 5;
+  bytes content = 6;
+  string created_by = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  string updated_by = 10;
+  repeated string active_users = 11;
+  Metadata metadata = 12;
 }
 
-// AccessControl defines access permissions
-message AccessControl {
-  // User or group identifier
-  string principal = 1;
-  
-  // Permission type
-  Permission permission = 2;
+message Metadata {
+  repeated string tags = 1;
+  string description = 2;
+  map<string, string> properties = 3;
+  Permissions permissions = 4;
 }
 
-// Permission types
-enum Permission {
-  PERMISSION_UNSPECIFIED = 0;
-  PERMISSION_READ = 1;
-  PERMISSION_WRITE = 2;
-  PERMISSION_ADMIN = 3;
+message Permissions {
+  string owner = 1;
+  repeated string editors = 2;
+  repeated string viewers = 3;
+  bool public = 4;
 }
 
-// Operation represents a collaborative operation
+message CreateDocumentRequest {
+  string name = 1;
+  string type = 2;
+  string created_by = 3;
+  bytes content = 4;
+  Metadata metadata = 5;
+}
+
+message CreateDocumentResponse {
+  Document document = 1;
+  string error = 2;
+}
+
+message GetDocumentRequest {
+  string doc_id = 1;
+}
+
+message GetDocumentResponse {
+  Document document = 1;
+  string error = 2;
+}
+
+message UpdateDocumentRequest {
+  Document document = 1;
+}
+
+message UpdateDocumentResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message DeleteDocumentRequest {
+  string doc_id = 1;
+  string user_id = 2;
+}
+
+message DeleteDocumentResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message ListDocumentsRequest {
+  string type = 1;
+  string state = 2;
+  string created_by = 3;
+  string user_id = 4;
+  int32 offset = 5;
+  int32 limit = 6;
+}
+
+message ListDocumentsResponse {
+  repeated Document documents = 1;
+  int32 total = 2;
+  string error = 3;
+}
+
+// ==================== 操作相关消息 ====================
+
 message Operation {
-  // Unique operation identifier
-  string operation_id = 1;
-  
-  // Target object ID
-  string object_id = 2;
-  
-  // Operation type
-  OperationType type = 3;
-  
-  // Operation data
-  google.protobuf.Any data = 4;
-  
-  // Operation timestamp
-  google.protobuf.Timestamp timestamp = 5;
-  
-  // User who performed the operation
-  string user_id = 6;
-  
-  // Session ID
-  string session_id = 7;
-  
-  // Operation sequence number
-  int64 sequence_number = 8;
-  
-  // Parent operation ID (for conflict resolution)
-  string parent_operation_id = 9;
-  
-  // Quantum protocol trace ID
-  string trace_id = 10;
-}
-
-// OperationType defines types of collaborative operations
-enum OperationType {
-  OPERATION_TYPE_UNSPECIFIED = 0;
-  OPERATION_TYPE_INSERT = 1;
-  OPERATION_TYPE_DELETE = 2;
-  OPERATION_TYPE_UPDATE = 3;
-  OPERATION_TYPE_MOVE = 4;
-  OPERATION_TYPE_TRANSFORM = 5;
-  OPERATION_TYPE_STYLE = 6;
-  OPERATION_TYPE_METADATA = 7;
-}
-
-// SyncStateRequest synchronizes state changes
-message SyncStateRequest {
-  // Target object ID
-  string object_id = 1;
-  
-  // Operations to apply
-  repeated Operation operations = 2;
-  
-  // Client's current version
-  int64 client_version = 3;
-  
-  // Session ID
+  string id = 1;
+  string doc_id = 2;
+  string user_id = 3;
   string session_id = 4;
-  
-  // Conflict resolution strategy
-  ConflictResolutionStrategy conflict_strategy = 5;
+  string type = 5;  // create, update, delete, move, resize, style, text
+  bytes data = 6;
+  google.protobuf.Timestamp timestamp = 7;
+  uint64 version = 8;
+  uint64 prev_version = 9;
+  string status = 10; // pending, applied, conflict, rejected, resolved
+  string client_id = 11;
+  OpMetadata metadata = 12;
 }
 
-// ConflictResolutionStrategy defines how to handle conflicts
-enum ConflictResolutionStrategy {
-  CONFLICT_RESOLUTION_STRATEGY_UNSPECIFIED = 0;
-  CONFLICT_RESOLUTION_STRATEGY_LAST_WRITE_WINS = 1;
-  CONFLICT_RESOLUTION_STRATEGY_OPERATIONAL_TRANSFORM = 2;
-  CONFLICT_RESOLUTION_STRATEGY_CRDT = 3;
-  CONFLICT_RESOLUTION_STRATEGY_MANUAL = 4;
+message OpMetadata {
+  string ip = 1;
+  string user_agent = 2;
+  string platform = 3;
+  map<string, string> extra = 4;
 }
 
-// SyncStateResponse returns synchronization results
-message SyncStateResponse {
-  // Updated state object
-  StateObject state_object = 1;
-  
-  // Applied operations
-  repeated Operation applied_operations = 2;
-  
-  // Conflicted operations that need resolution
-  repeated ConflictedOperation conflicted_operations = 3;
-  
-  // Synchronization metadata
-  SyncMetadata sync_metadata = 4;
-}
-
-// ConflictedOperation represents an operation that conflicts
-message ConflictedOperation {
-  // The conflicted operation
-  Operation operation = 1;
-  
-  // Conflicting operations
-  repeated Operation conflicts = 2;
-  
-  // Suggested resolution
-  Operation suggested_resolution = 3;
-  
-  // Conflict reason
-  string conflict_reason = 4;
-}
-
-// SyncMetadata contains synchronization information
-message SyncMetadata {
-  // Server timestamp
-  google.protobuf.Timestamp server_timestamp = 1;
-  
-  // Synchronization latency in milliseconds
-  double sync_latency_ms = 2;
-  
-  // Number of operations processed
-  int32 operations_processed = 3;
-  
-  // Number of conflicts resolved
-  int32 conflicts_resolved = 4;
-  
-  // Quantum protocol performance metrics
-  QuantumMetrics quantum_metrics = 5;
-}
-
-// QuantumMetrics contains Quantum protocol performance data
-message QuantumMetrics {
-  // Round-trip time in milliseconds
-  double rtt_ms = 1;
-  
-  // Packet loss rate
-  double packet_loss_rate = 2;
-  
-  // FEC recovery count
-  int32 fec_recoveries = 3;
-  
-  // Retransmission count
-  int32 retransmissions = 4;
-  
-  // Current congestion window size
-  int32 cwnd_size = 5;
-}
-
-// GetStateRequest retrieves current state
-message GetStateRequest {
-  string object_id = 1;
-  int64 version = 2; // Optional: get specific version
-}
-
-// GetStateResponse returns current state
-message GetStateResponse {
-  StateObject state_object = 1;
-}
-
-// SubscribeToStateRequest establishes state subscription
-message SubscribeToStateRequest {
-  // Object IDs to subscribe to
-  repeated string object_ids = 1;
-  
-  // Session ID
-  string session_id = 2;
-  
-  // Subscription filters
-  repeated SubscriptionFilter filters = 3;
-}
-
-// SubscriptionFilter defines subscription criteria
-message SubscriptionFilter {
-  // Filter type
-  FilterType type = 1;
-  
-  // Filter value
-  string value = 2;
-}
-
-// FilterType defines filter types
-enum FilterType {
-  FILTER_TYPE_UNSPECIFIED = 0;
-  FILTER_TYPE_OPERATION_TYPE = 1;
-  FILTER_TYPE_USER_ID = 2;
-  FILTER_TYPE_OBJECT_TYPE = 3;
-  FILTER_TYPE_METADATA_KEY = 4;
-}
-
-// StateChangeEvent represents a state change notification
-message StateChangeEvent {
-  // Event type
-  EventType event_type = 1;
-  
-  // Target object ID
-  string object_id = 2;
-  
-  // Applied operation
-  Operation operation = 3;
-  
-  // Updated state object (for full updates)
-  StateObject state_object = 4;
-  
-  // Event timestamp
-  google.protobuf.Timestamp timestamp = 5;
-  
-  // Event metadata
-  map<string, string> metadata = 6;
-}
-
-// EventType defines state change event types
-enum EventType {
-  EVENT_TYPE_UNSPECIFIED = 0;
-  EVENT_TYPE_OPERATION_APPLIED = 1;
-  EVENT_TYPE_STATE_UPDATED = 2;
-  EVENT_TYPE_OBJECT_CREATED = 3;
-  EVENT_TYPE_OBJECT_DELETED = 4;
-  EVENT_TYPE_CONFLICT_DETECTED = 5;
-  EVENT_TYPE_SNAPSHOT_CREATED = 6;
-}
-
-// ApplyOperationRequest applies a single operation
 message ApplyOperationRequest {
   Operation operation = 1;
-  string session_id = 2;
-  ConflictResolutionStrategy conflict_strategy = 3;
 }
 
-// ApplyOperationResponse returns operation result
 message ApplyOperationResponse {
   bool success = 1;
   Operation applied_operation = 2;
-  repeated ConflictedOperation conflicts = 3;
-  SyncMetadata sync_metadata = 4;
+  string error = 3;
 }
 
-// GetOperationHistoryRequest retrieves operation history
 message GetOperationHistoryRequest {
-  string object_id = 1;
-  int64 from_version = 2;
-  int64 to_version = 3;
-  int32 limit = 4;
+  string doc_id = 1;
+  int32 limit = 2;
 }
 
-// GetOperationHistoryResponse returns operation history
 message GetOperationHistoryResponse {
   repeated Operation operations = 1;
-  bool has_more = 2;
-  string next_cursor = 3;
+  string error = 2;
 }
 
-// CreateSnapshotRequest creates a state snapshot
-message CreateSnapshotRequest {
-  string object_id = 1;
-  string snapshot_name = 2;
-  map<string, string> metadata = 3;
+// ==================== 订阅相关消息 ====================
+
+message SubscribeDocumentRequest {
+  string doc_id = 1;
+  string user_id = 2;
+  string session_id = 3;
 }
 
-// CreateSnapshotResponse returns snapshot information
-message CreateSnapshotResponse {
-  Snapshot snapshot = 1;
+message UnsubscribeDocumentRequest {
+  string subscriber_id = 1;
+  string doc_id = 2;
+  string user_id = 3;
 }
 
-// Snapshot represents a state snapshot
-message Snapshot {
-  string snapshot_id = 1;
-  string object_id = 2;
-  string name = 3;
-  int64 version = 4;
-  google.protobuf.Timestamp created_at = 5;
-  string created_by = 6;
-  map<string, string> metadata = 7;
-  int64 size_bytes = 8;
-}
-
-// RestoreFromSnapshotRequest restores from snapshot
-message RestoreFromSnapshotRequest {
-  string snapshot_id = 1;
-  string session_id = 2;
-}
-
-// RestoreFromSnapshotResponse returns restoration result
-message RestoreFromSnapshotResponse {
+message UnsubscribeDocumentResponse {
   bool success = 1;
-  StateObject restored_state = 2;
-  string message = 3;
+  string error = 2;
+}
+
+message OperationEvent {
+  string id = 1;
+  string type = 2;  // operation_applied, document_updated, user_joined, user_left, conflict_detected, conflict_resolved
+  string doc_id = 3;
+  string user_id = 4;
+  Operation operation = 5;
+  Document document = 6;
+  Conflict conflict = 7;
+  google.protobuf.Timestamp timestamp = 8;
+  map<string, string> data = 9;
+}
+
+// ==================== 冲突相关消息 ====================
+
+message Conflict {
+  string id = 1;
+  string doc_id = 2;
+  repeated Operation ops = 3;
+  string resolution = 4;  // lww, manual, merge
+  string resolved_by = 5;
+  Operation resolved_op = 6;
+  google.protobuf.Timestamp resolved_at = 7;
+  string description = 8;
+}
+
+// ==================== 锁相关消息 ====================
+
+message Lock {
+  string id = 1;
+  string doc_id = 2;
+  string user_id = 3;
+  string session_id = 4;
+  google.protobuf.Timestamp acquired_at = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  bool active = 7;
+}
+
+message AcquireLockRequest {
+  string doc_id = 1;
+  string user_id = 2;
+  string session_id = 3;
+}
+
+message AcquireLockResponse {
+  Lock lock = 1;
+  string error = 2;
+}
+
+message ReleaseLockRequest {
+  string doc_id = 1;
+  string user_id = 2;
+}
+
+message ReleaseLockResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message IsLockedRequest {
+  string doc_id = 1;
+}
+
+message IsLockedResponse {
+  bool locked = 1;
+  Lock lock = 2;
+  string error = 3;
+}
+
+// ==================== 统计信息相关消息 ====================
+
+message Stats {
+  int64 total_documents = 1;
+  int64 active_documents = 2;
+  int64 archived_documents = 3;
+  int64 total_operations = 4;
+  int64 total_conflicts = 5;
+  int64 resolved_conflicts = 6;
+  int64 active_subscribers = 7;
+  int64 active_locks = 8;
+  google.protobuf.Timestamp last_updated = 9;
+}
+
+message GetStatsRequest {
+  // 空请求
+}
+
+message GetStatsResponse {
+  Stats stats = 1;
+  string error = 2;
 }
