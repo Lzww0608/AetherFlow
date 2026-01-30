@@ -1,0 +1,88 @@
+# API Gateway Configuration
+
+Name: aetherflow-gateway
+Host: 0.0.0.0
+Port: 8080
+Mode: dev  # dev, test, prod
+
+# 日志配置
+Log:
+  ServiceName: aetherflow-gateway
+  Mode: console  # console, file, volume
+  Path: logs/gateway
+  Level: info  # debug, info, warn, error
+  Compress: false
+  KeepDays: 7
+  StackCooldownMillis: 100
+
+# 超时配置
+Timeout: 30000  # 30秒 (毫秒)
+
+# CORS配置
+Cors:
+  Enable: true
+  AllowOrigins:
+    - "*"
+  AllowMethods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+  AllowHeaders:
+    - Content-Type
+    - Authorization
+    - X-Request-ID
+    - X-Session-ID
+  ExposeHeaders:
+    - X-Request-ID
+  AllowCredentials: true
+  MaxAge: 3600
+
+# 服务发现配置
+Etcd:
+  Hosts:
+    - 127.0.0.1:2379
+  Key: aetherflow/services
+  
+# Session Service配置
+SessionService:
+  Endpoints:
+    - 127.0.0.1:50051
+  Timeout: 5000  # 5秒
+  
+# StateSync Service配置
+StateSyncService:
+  Endpoints:
+    - 127.0.0.1:50052
+  Timeout: 5000  # 5秒
+
+# Telemetry配置
+Telemetry:
+  Name: aetherflow-gateway
+  Endpoint: http://localhost:14268/api/traces
+  Sampler: 1.0
+  Batcher: jaeger
+
+# Prometheus配置
+Prometheus:
+  Host: 0.0.0.0
+  Port: 9091
+  Path: /metrics
+
+# 限流配置
+RateLimit:
+  Enable: true
+  Rate: 100  # 每秒请求数
+  Burst: 200  # 突发容量
+
+# 熔断配置
+Breaker:
+  Enable: true
+  Threshold: 0.5  # 错误率阈值
+
+# 健康检查配置
+Health:
+  Enable: true
+  Interval: 10  # 秒
+  Timeout: 3    # 秒
