@@ -24,16 +24,28 @@ API Gateway 是 AetherFlow 项目的统一入口，基于 **go-zero** 框架构�
 - ✅ `/health` - 服务健康状态
 - ✅ `/ping` - 简单心跳检测
 - ✅ `/version` - 版本信息
+- ✅ `/ws/stats` - WebSocket统计信息
 
 #### 4. 通用响应结构
 - ✅ 统一的JSON响应格式
 - ✅ 错误码管理
 - ✅ RequestID追踪
 
+#### 5. WebSocket支持 ⭐ (新增)
+- ✅ **WebSocket升级** - HTTP到WebSocket协议升级
+- ✅ **连接管理** - 连接注册、注销、生命周期管理
+- ✅ **消息协议** - 9种消息类型 (Ping/Pong/Auth/Subscribe/Publish等)
+- ✅ **Hub管理** - 集中式连接管理中心
+- ✅ **心跳机制** - 自动Ping/Pong保活
+- ✅ **超时检测** - 自动清理死连接
+- ✅ **频道订阅** - 支持发布/订阅模式
+- ✅ **用户追踪** - 支持发送消息给特定用户
+- ✅ **广播功能** - 全局广播、频道广播、用户广播
+- ✅ **单元测试** - 16个测试用例，44.3%覆盖率
+
 ### 🚧 待实现
 
 - ⏳ JWT认证中间件
-- ⏳ WebSocket支持
 - ⏳ gRPC客户端连接池
 - ⏳ Session Service集成
 - ⏳ StateSync Service集成
@@ -124,6 +136,83 @@ curl http://localhost:8080/version
 ```
 
 ## API文档
+
+### WebSocket端点
+
+#### GET /ws
+
+WebSocket连接端点
+
+**连接示例** (JavaScript):
+```javascript
+const ws = new WebSocket('ws://localhost:8080/ws');
+
+ws.onopen = () => {
+    console.log('Connected');
+    
+    // 1. 认证
+    ws.send(JSON.stringify({
+        type: 'auth',
+        data: {
+            token: 'your-jwt-token'
+        }
+    }));
+};
+
+ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    console.log('Received:', msg);
+    
+    if (msg.type === 'auth_result' && msg.data.success) {
+        console.log('Authenticated as:', msg.data.user_id);
+        
+        // 2. 订阅频道
+        ws.send(JSON.stringify({
+            type: 'subscribe',
+            data: {
+                channel: 'room-123'
+            }
+        }));
+    }
+    
+    if (msg.type === 'notify') {
+        console.log('Notification:', msg.data);
+    }
+};
+
+// 3. 发布消息
+function publishMessage(channel, data) {
+    ws.send(JSON.stringify({
+        type: 'publish',
+        data: {
+            channel: channel,
+            data: data
+        }
+    }));
+}
+
+// 4. Ping (保活)
+setInterval(() => {
+    ws.send(JSON.stringify({type: 'ping'}));
+}, 30000);
+```
+
+#### GET /ws/stats
+
+WebSocket统计信息
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "total_connections": 156,
+    "authenticated_users": 89,
+    "total_channels": 45
+  }
+}
+```
 
 ### 健康检查端点
 
@@ -274,7 +363,98 @@ RateLimit:
 | 429 | 请求过于频繁 |
 | 500 | 服务器内部错误 |
 
+## WebSocket消息协议
+
+### 消息格式
+
+所有WebSocket消息使用JSON格式：
+
+```json
+{
+  "id": "01JKX...",        // 消息ID (UUIDv7)
+  "type": "message_type",  // 消息类型
+  "timestamp": "2026-01-15T10:30:00Z",
+  "data": {},              // 消息数据
+  "request_id": "xxx",     // 可选：关联的请求ID
+  "error": "error message" // 可选：错误信息
+}
+```
+
+### 消息类型
+
+| 类型 | 方向 | 说明 |
+|------|------|------|
+| `ping` | Client→Server | 心跳请求 |
+| `pong` | Server→Client | 心跳响应 |
+| `auth` | Client→Server | 认证请求 |
+| `auth_result` | Server→Client | 认证结果 |
+| `subscribe` | Client→Server | 订阅频道 |
+| `unsubscribe` | Client→Server | 取消订阅 |
+| `publish` | Client→Server | 发布消息 |
+| `notify` | Server→Client | 通知消息 |
+| `error` | Server→Client | 错误消息 |
+
+### 认证流程
+
+```
+Client                  Server
+  |                       |
+  |-- auth (token) ------>|
+  |                       | (验证token)
+  |<-- auth_result -------|
+  |    (success=true)     |
+```
+
+### 发布/订阅流程
+
+```
+Client A                Server                Client B
+  |                       |                       |
+  |-- subscribe(room1) -->|                       |
+  |<-- success ----------|                       |
+  |                       |<-- subscribe(room1) --|
+  |                       |-- success ----------->|
+  |                       |                       |
+  |-- publish(room1) ---->|                       |
+  |                       |-- notify(room1) ----->|
+  |<-- success ----------|-- notify(room1) ----->|
+```
+
 ## 开发指南
+
+### WebSocket开发示例
+
+#### 服务端广播消息
+
+```go
+// 广播到所有连接
+msg := websocket.NewMessage(websocket.MessageTypeNotify, map[string]interface{}{
+    "event": "system_update",
+    "data": "Server will restart in 5 minutes",
+})
+count := svcCtx.WSServer.Broadcast(msg)
+
+// 广播到特定频道
+count := svcCtx.WSServer.BroadcastToChannel("room-123", msg)
+
+// 发送给特定用户的所有连接
+count := svcCtx.WSServer.SendToUser("user-456", msg)
+```
+
+#### 自定义认证函数
+
+```go
+// 在main.go中设置认证函数
+svcCtx.WSServer.SetAuthFunc(func(token string) (userID, sessionID string, err error) {
+    // 验证JWT token
+    claims, err := verifyJWT(token)
+    if err != nil {
+        return "", "", err
+    }
+    
+    return claims.UserID, claims.SessionID, nil
+})
+```
 
 ### 添加新路由
 

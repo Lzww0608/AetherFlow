@@ -25,6 +25,16 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 				Path:    "/version",
 				Handler: VersionHandler(svcCtx),
 			},
+			{
+				Method:  "GET",
+				Path:    "/ws",
+				Handler: WebSocketHandler(svcCtx),
+			},
+			{
+				Method:  "GET",
+				Path:    "/ws/stats",
+				Handler: WebSocketStatsHandler(svcCtx),
+			},
 		},
 	)
 

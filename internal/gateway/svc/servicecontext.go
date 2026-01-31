@@ -2,14 +2,16 @@ package svc
 
 import (
 	"github.com/aetherflow/aetherflow/internal/gateway/config"
+	"github.com/aetherflow/aetherflow/internal/gateway/websocket"
 	"go.uber.org/zap"
 )
 
 // ServiceContext 服务上下文
 type ServiceContext struct {
-	Config config.Config
-	Logger *zap.Logger
-
+	Config    config.Config
+	Logger    *zap.Logger
+	WSServer  *websocket.Server
+	
 	// 将来添加: gRPC客户端连接池
 	// SessionClient  session.SessionServiceClient
 	// StateSyncClient statesync.StateSyncServiceClient
@@ -23,14 +25,21 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		panic(err)
 	}
 
+	// 创建WebSocket服务器
+	wsServer := websocket.NewServer(logger)
+
 	return &ServiceContext{
-		Config: c,
-		Logger: logger,
+		Config:   c,
+		Logger:   logger,
+		WSServer: wsServer,
 	}
 }
 
 // Close 关闭服务上下文
 func (ctx *ServiceContext) Close() {
+	if ctx.WSServer != nil {
+		ctx.WSServer.Close()
+	}
 	if ctx.Logger != nil {
 		_ = ctx.Logger.Sync()
 	}
