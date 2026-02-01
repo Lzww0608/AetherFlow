@@ -86,3 +86,10 @@ Health:
   Enable: true
   Interval: 10  # 秒
   Timeout: 3    # 秒
+
+# JWT配置
+JWT:
+  Secret: "aetherflow-secret-key-change-in-production"
+  Expire: 86400      # 24小时 (秒)
+  RefreshExpire: 604800  # 7天 (秒)
+  Issuer: "aetherflow"

@@ -49,7 +49,7 @@ func (s *Server) SetMessageHandler(handler MessageHandler) {
 }
 
 // SetAuthFunc 设置认证函数
-func (s *Server) SetAuthFunc(f func(string) (string, string, error)) {
+func (s *Server) SetAuthFunc(f func(string) (string, string, string, string, error)) {
 	if defaultHandler, ok := s.handler.(*DefaultHandler); ok {
 		defaultHandler.SetAuthFunc(f)
 	}

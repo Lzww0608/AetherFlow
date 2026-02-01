@@ -38,6 +38,36 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		},
 	)
 
+	// 认证路由（无需JWT）
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  "POST",
+				Path:    "/auth/login",
+				Handler: LoginHandler(svcCtx),
+			},
+			{
+				Method:  "POST",
+				Path:    "/auth/refresh",
+				Handler: RefreshTokenHandler(svcCtx),
+			},
+		},
+		rest.WithPrefix("/api/v1"),
+	)
+
+	// 需要JWT认证的路由
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  "GET",
+				Path:    "/auth/me",
+				Handler: MeHandler(svcCtx),
+			},
+		},
+		rest.WithPrefix("/api/v1"),
+		rest.WithJwt(svcCtx.Config.JWT.Secret),
+	)
+
 	// Session相关路由 (将来实现)
 	server.AddRoutes(
 		[]rest.Route{

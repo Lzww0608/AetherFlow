@@ -27,6 +27,9 @@ type Config struct {
 
 	// 健康检查配置
 	Health HealthConfig `json:",optional"`
+	
+	// JWT配置
+	JWT JWTConfig `json:",optional"`
 }
 
 // LogConfig 日志配置
@@ -81,4 +84,12 @@ type HealthConfig struct {
 	Enable   bool `json:",default=true"`
 	Interval int  `json:",default=10"` // 秒
 	Timeout  int  `json:",default=3"`  // 秒
+}
+
+// JWTConfig JWT配置
+type JWTConfig struct {
+	Secret     string `json:",default=aetherflow-secret-key"` // JWT密钥
+	Expire     int64  `json:",default=86400"`                  // 过期时间（秒，默认24小时）
+	RefreshExpire int64 `json:",default=604800"`               // 刷新令牌过期时间（秒，默认7天）
+	Issuer     string `json:",default=aetherflow"`            // 签发者
 }

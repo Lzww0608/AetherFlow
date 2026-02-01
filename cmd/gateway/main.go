@@ -39,6 +39,15 @@ func main() {
 	// 创建服务上下文
 	ctx := svc.NewServiceContext(c)
 
+	// 设置WebSocket JWT认证
+	ctx.WSServer.SetAuthFunc(func(token string) (userID, sessionID, username, email string, err error) {
+		claims, err := ctx.JWTManager.VerifyToken(token)
+		if err != nil {
+			return "", "", "", "", err
+		}
+		return claims.UserID, claims.SessionID, claims.Username, claims.Email, nil
+	})
+
 	// 注册全局中间件
 	server.Use(middleware.RequestIDMiddleware)
 	server.Use(middleware.LoggerMiddleware(ctx))

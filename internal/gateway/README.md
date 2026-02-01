@@ -31,7 +31,7 @@ API Gateway 是 AetherFlow 项目的统一入口，基于 **go-zero** 框架构�
 - ✅ 错误码管理
 - ✅ RequestID追踪
 
-#### 5. WebSocket支持 ⭐ (新增)
+#### 5. WebSocket支持 ⭐
 - ✅ **WebSocket升级** - HTTP到WebSocket协议升级
 - ✅ **连接管理** - 连接注册、注销、生命周期管理
 - ✅ **消息协议** - 9种消息类型 (Ping/Pong/Auth/Subscribe/Publish等)
@@ -43,9 +43,37 @@ API Gateway 是 AetherFlow 项目的统一入口，基于 **go-zero** 框架构�
 - ✅ **广播功能** - 全局广播、频道广播、用户广播
 - ✅ **单元测试** - 16个测试用例，44.3%覆盖率
 
+#### 6. JWT认证 ⭐ (新增)
+- ✅ **JWT工具包** (`jwt/jwt.go`) - 生成、验证、刷新令牌
+- ✅ **JWT中间件** (`middleware/jwt.go`) - 强制/可选认证
+- ✅ **Claims结构** - UserID/SessionID/Username/Email
+- ✅ **认证API** - Login/Refresh/Me端点
+- ✅ **WebSocket集成** - JWT token验证
+- ✅ **配置支持** - Secret/Expire/RefreshExpire/Issuer
+- ✅ **单元测试** - 11个测试用例，84.6%覆盖率
+
+**JWT特性**:
+```
+令牌管理:
+- 访问令牌生成 (默认24小时)
+- 刷新令牌生成 (默认7天)
+- 令牌验证 (HS256签名)
+- 令牌刷新
+- 令牌解析 (不验证过期)
+
+声明支持:
+- UserID, SessionID (必需)
+- Username, Email (可选)
+- Issuer, IssuedAt, ExpiresAt, NotBefore
+
+中间件:
+- JWTMiddleware (强制认证)
+- OptionalJWTMiddleware (可选认证)
+- Context传递
+```
+
 ### 🚧 待实现
 
-- ⏳ JWT认证中间件
 - ⏳ gRPC客户端连接池
 - ⏳ Session Service集成
 - ⏳ StateSync Service集成
@@ -137,24 +165,123 @@ curl http://localhost:8080/version
 
 ## API文档
 
+### 认证端点
+
+#### POST /api/v1/auth/login
+
+用户登录
+
+**请求体**:
+```json
+{
+  "username": "test",
+  "password": "test"
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": 86400,
+    "user_id": "user-123",
+    "username": "test"
+  },
+  "request_id": "01JKX..."
+}
+```
+
+#### POST /api/v1/auth/refresh
+
+刷新访问令牌
+
+**请求体**:
+```json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": 86400
+  },
+  "request_id": "01JKX..."
+}
+```
+
+#### GET /api/v1/auth/me
+
+获取当前用户信息（需要JWT认证）
+
+**请求头**:
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "user_id": "user-123",
+    "session_id": "session-456",
+    "username": "test",
+    "email": "test@example.com"
+  },
+  "request_id": "01JKX..."
+}
+```
+
 ### WebSocket端点
 
 #### GET /ws
 
 WebSocket连接端点
 
-**连接示例** (JavaScript):
+**完整流程示例** (JavaScript):
 ```javascript
+// Step 1: 登录获取JWT token
+async function login() {
+    const response = await fetch('http://localhost:8080/api/v1/auth/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            username: 'test',
+            password: 'test'
+        })
+    });
+    
+    const data = await response.json();
+    if (data.code === 0) {
+        localStorage.setItem('token', data.data.token);
+        localStorage.setItem('refresh_token', data.data.refresh_token);
+        return data.data.token;
+    }
+}
+
+// Step 2: 使用JWT token建立WebSocket连接
+const token = localStorage.getItem('token');
 const ws = new WebSocket('ws://localhost:8080/ws');
 
 ws.onopen = () => {
     console.log('Connected');
     
-    // 1. 认证
+    // 使用JWT token认证
     ws.send(JSON.stringify({
         type: 'auth',
         data: {
-            token: 'your-jwt-token'
+            token: token  // JWT token
         }
     }));
 };
@@ -328,6 +455,20 @@ RateLimit:
 | Cors.AllowOrigins | []string | ["*"] | 允许的源 |
 | Cors.AllowMethods | []string | [GET,POST...] | 允许的方法 |
 
+### JWT配置
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| JWT.Secret | string | aetherflow-secret-key | JWT密钥（生产环境必须修改） |
+| JWT.Expire | int64 | 86400 | 访问令牌过期时间（秒，24小时） |
+| JWT.RefreshExpire | int64 | 604800 | 刷新令牌过期时间（秒，7天） |
+| JWT.Issuer | string | aetherflow | 令牌签发者 |
+
+**安全提示**:
+- ⚠️ 生产环境必须修改JWT.Secret为强随机字符串
+- ⚠️ 建议使用环境变量而不是配置文件存储密钥
+- ⚠️ 定期轮换JWT密钥
+
 ## 响应格式
 
 ### 成功响应
@@ -444,16 +585,63 @@ count := svcCtx.WSServer.SendToUser("user-456", msg)
 #### 自定义认证函数
 
 ```go
-// 在main.go中设置认证函数
-svcCtx.WSServer.SetAuthFunc(func(token string) (userID, sessionID string, err error) {
-    // 验证JWT token
-    claims, err := verifyJWT(token)
+// 在main.go中设置WebSocket JWT认证
+ctx.WSServer.SetAuthFunc(func(token string) (userID, sessionID, username, email string, err error) {
+    // 使用JWT管理器验证token
+    claims, err := ctx.JWTManager.VerifyToken(token)
     if err != nil {
-        return "", "", err
+        return "", "", "", "", err
     }
     
-    return claims.UserID, claims.SessionID, nil
+    return claims.UserID, claims.SessionID, claims.Username, claims.Email, nil
 })
+```
+
+#### JWT令牌操作
+
+```go
+// 生成访问令牌
+token, err := svcCtx.JWTManager.GenerateToken(
+    userID, sessionID, username, email,
+)
+
+// 生成刷新令牌
+refreshToken, err := svcCtx.JWTManager.GenerateRefreshToken(
+    userID, sessionID,
+)
+
+// 验证令牌
+claims, err := svcCtx.JWTManager.VerifyToken(token)
+
+// 刷新令牌
+newToken, err := svcCtx.JWTManager.RefreshToken(refreshToken)
+
+// 解析令牌（不验证过期）
+claims, err := svcCtx.JWTManager.ParseToken(token)
+```
+
+#### 使用JWT中间件保护路由
+
+```go
+import "github.com/aetherflow/aetherflow/internal/gateway/middleware"
+
+// 方式1: 使用go-zero内置JWT中间件
+server.AddRoutes(
+    []rest.Route{
+        {
+            Method:  "GET",
+            Path:    "/protected",
+            Handler: ProtectedHandler(svcCtx),
+        },
+    },
+    rest.WithJwt(svcCtx.Config.JWT.Secret),
+)
+
+// 方式2: 使用自定义JWT中间件
+server.Use(middleware.JWTMiddleware(svcCtx.JWTManager))
+
+// 方式3: 可选认证（不强制）
+server.Use(middleware.OptionalJWTMiddleware(svcCtx.JWTManager))
 ```
 
 ### 添加新路由
@@ -600,6 +788,20 @@ Log:
 
 ## 版本历史
 
+### v0.4.0-alpha (2026-01-15)
+
+**新增**:
+- ✅ WebSocket完整支持
+- ✅ JWT认证系统
+- ✅ 认证API端点
+- ✅ WebSocket + JWT集成
+- ✅ 27个单元测试
+
+**改进**:
+- 提升测试覆盖率
+- 完善文档
+- 优化连接管理
+
 ### v0.3.0-alpha (2026-01-15)
 
 **新增**:
@@ -610,9 +812,8 @@ Log:
 - ✅ 限流功能
 
 **下一步计划**:
-- JWT认证
-- WebSocket支持
-- gRPC集成
+- gRPC客户端集成
+- 服务发现
 
 ## 相关文档
 

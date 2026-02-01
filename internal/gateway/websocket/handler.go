@@ -15,7 +15,7 @@ type DefaultHandler struct {
 	logger *zap.Logger
 	
 	// 认证回调 (可选)
-	authFunc func(token string) (userID, sessionID string, err error)
+	authFunc func(token string) (userID, sessionID, username, email string, err error)
 }
 
 // NewDefaultHandler 创建默认处理器
@@ -27,7 +27,7 @@ func NewDefaultHandler(hub *Hub, logger *zap.Logger) *DefaultHandler {
 }
 
 // SetAuthFunc 设置认证函数
-func (h *DefaultHandler) SetAuthFunc(f func(string) (string, string, error)) {
+func (h *DefaultHandler) SetAuthFunc(f func(string) (string, string, string, string, error)) {
 	h.authFunc = f
 }
 
@@ -102,11 +102,11 @@ func (h *DefaultHandler) handleAuth(conn *Connection, msg *Message) {
 	}
 	
 	// 调用认证函数
-	var userID, sessionID string
+	var userID, sessionID, username, email string
 	var err error
 	
 	if h.authFunc != nil {
-		userID, sessionID, err = h.authFunc(token)
+		userID, sessionID, username, email, err = h.authFunc(token)
 		if err != nil {
 			conn.Send(&Message{
 				ID:    newMessageID(),
@@ -122,10 +122,20 @@ func (h *DefaultHandler) handleAuth(conn *Connection, msg *Message) {
 		// 如果没有设置认证函数，使用测试模式
 		userID = "test_user"
 		sessionID = "test_session"
+		username = "Test User"
+		email = "test@example.com"
 	}
 	
 	// 设置连接的用户ID
 	h.hub.SetUserID(conn.ID, userID, sessionID)
+	
+	// 记录认证成功（使用username和email）
+	h.logger.Info("WebSocket authentication successful",
+		zap.String("user_id", userID),
+		zap.String("session_id", sessionID),
+		zap.String("username", username),
+		zap.String("email", email),
+	)
 	
 	// 发送认证成功响应
 	conn.Send(&Message{
