@@ -1,7 +1,10 @@
 package svc
 
 import (
+	"time"
+
 	"github.com/aetherflow/aetherflow/internal/gateway/config"
+	"github.com/aetherflow/aetherflow/internal/gateway/grpcclient"
 	"github.com/aetherflow/aetherflow/internal/gateway/jwt"
 	"github.com/aetherflow/aetherflow/internal/gateway/websocket"
 	"go.uber.org/zap"
@@ -9,14 +12,15 @@ import (
 
 // ServiceContext 服务上下文
 type ServiceContext struct {
-	Config     config.Config
-	Logger     *zap.Logger
-	WSServer   *websocket.Server
-	JWTManager *jwt.JWTManager
+	Config          config.Config
+	Logger          *zap.Logger
+	WSServer        *websocket.Server
+	JWTManager      *jwt.JWTManager
 	
-	// 将来添加: gRPC客户端连接池
-	// SessionClient  session.SessionServiceClient
-	// StateSyncClient statesync.StateSyncServiceClient
+	// gRPC客户端
+	GRPCManager     *grpcclient.Manager
+	SessionClient   *grpcclient.SessionClient
+	StateSyncClient *grpcclient.StateSyncClient
 }
 
 // NewServiceContext 创建服务上下文
@@ -38,11 +42,53 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		c.JWT.Issuer,
 	)
 
+	// 创建gRPC客户端管理器
+	grpcManager := grpcclient.NewManager(logger)
+	
+	// 注册Session服务连接池
+	grpcManager.RegisterPool(
+		"session",
+		c.GRPC.Session.Target,
+		c.GRPC.Pool.MaxIdle,
+		c.GRPC.Pool.MaxActive,
+		time.Duration(c.GRPC.Pool.IdleTimeout)*time.Second,
+	)
+	
+	// 注册StateSync服务连接池
+	grpcManager.RegisterPool(
+		"statesync",
+		c.GRPC.StateSync.Target,
+		c.GRPC.Pool.MaxIdle,
+		c.GRPC.Pool.MaxActive,
+		time.Duration(c.GRPC.Pool.IdleTimeout)*time.Second,
+	)
+
+	// 创建Session客户端
+	sessionClient := grpcclient.NewSessionClient(
+		grpcManager,
+		"session",
+		time.Duration(c.GRPC.Session.Timeout)*time.Millisecond,
+		c.GRPC.Session.MaxRetries,
+		logger,
+	)
+	
+	// 创建StateSync客户端
+	stateSyncClient := grpcclient.NewStateSyncClient(
+		grpcManager,
+		"statesync",
+		time.Duration(c.GRPC.StateSync.Timeout)*time.Millisecond,
+		c.GRPC.StateSync.MaxRetries,
+		logger,
+	)
+
 	return &ServiceContext{
-		Config:     c,
-		Logger:     logger,
-		WSServer:   wsServer,
-		JWTManager: jwtManager,
+		Config:          c,
+		Logger:          logger,
+		WSServer:        wsServer,
+		JWTManager:      jwtManager,
+		GRPCManager:     grpcManager,
+		SessionClient:   sessionClient,
+		StateSyncClient: stateSyncClient,
 	}
 }
 
@@ -51,6 +97,13 @@ func (ctx *ServiceContext) Close() {
 	if ctx.WSServer != nil {
 		ctx.WSServer.Close()
 	}
+	
+	if ctx.GRPCManager != nil {
+		if err := ctx.GRPCManager.Close(); err != nil {
+			ctx.Logger.Error("Failed to close gRPC manager", zap.Error(err))
+		}
+	}
+	
 	if ctx.Logger != nil {
 		_ = ctx.Logger.Sync()
 	}

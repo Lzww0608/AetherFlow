@@ -43,7 +43,7 @@ API Gateway 是 AetherFlow 项目的统一入口，基于 **go-zero** 框架构�
 - ✅ **广播功能** - 全局广播、频道广播、用户广播
 - ✅ **单元测试** - 16个测试用例，44.3%覆盖率
 
-#### 6. JWT认证 ⭐ (新增)
+#### 6. JWT认证 ⭐
 - ✅ **JWT工具包** (`jwt/jwt.go`) - 生成、验证、刷新令牌
 - ✅ **JWT中间件** (`middleware/jwt.go`) - 强制/可选认证
 - ✅ **Claims结构** - UserID/SessionID/Username/Email
@@ -72,9 +72,43 @@ API Gateway 是 AetherFlow 项目的统一入口，基于 **go-zero** 框架构�
 - Context传递
 ```
 
+#### 7. gRPC客户端集成 ⭐ (新增)
+- ✅ **连接池管理** (`grpcclient/manager.go`) - 连接池与管理器
+- ✅ **Session客户端** (`grpcclient/session.go`) - Session服务封装
+- ✅ **StateSync客户端** (`grpcclient/statesync.go`) - StateSync服务封装
+- ✅ **HTTP桥接** (`handler/session.go`, `handler/statesync.go`) - REST到gRPC
+- ✅ **自动重试** - 失败自动重试机制
+- ✅ **超时控制** - 可配置的请求超时
+- ✅ **连接复用** - 高效的连接池
+- ✅ **单元测试** - 5个测试用例
+
+**gRPC特性**:
+```
+连接池:
+- 最大空闲连接数 (MaxIdle)
+- 最大活跃连接数 (MaxActive)
+- 空闲超时 (IdleTimeout)
+- 连接状态检查
+- 统计信息
+
+客户端:
+- Session服务 (6个RPC方法)
+- StateSync服务 (12个RPC方法)
+- 自动重试 (可配置次数)
+- 超时控制 (可配置时间)
+- 流式RPC支持
+
+HTTP API:
+- Session API (5个端点)
+- StateSync API (8个端点)
+- JWT认证保护
+- 统一响应格式
+```
+
 ### 🚧 待实现
 
-- ⏳ gRPC客户端连接池
+- ⏳ gRPC over Quantum自定义Dialer
+- ⏳ Etcd服务发现
 - ⏳ Session Service集成
 - ⏳ StateSync Service集成
 - ⏳ Etcd服务发现
@@ -242,6 +276,211 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
   "request_id": "01JKX..."
 }
 ```
+
+### Session API
+
+#### POST /api/v1/session
+
+创建新会话（需要JWT认证）
+
+**请求体**:
+```json
+{
+  "client_ip": "192.168.1.100",
+  "client_port": 54321,
+  "metadata": {
+    "device": "iPhone",
+    "app_version": "1.0.0"
+  },
+  "timeout_seconds": 3600
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "session": {
+      "session_id": "01JKX...",
+      "user_id": "user-123",
+      "connection_id": "conn-456",
+      "state": "SESSION_STATE_ACTIVE",
+      ...
+    },
+    "token": "session-token-..."
+  },
+  "request_id": "01JKX..."
+}
+```
+
+#### GET /api/v1/session
+
+获取会话信息（需要JWT认证）
+
+**查询参数**:
+- `session_id`: 会话ID
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "session_id": "01JKX...",
+    "user_id": "user-123",
+    "state": "SESSION_STATE_ACTIVE",
+    ...
+  },
+  "request_id": "01JKX..."
+}
+```
+
+#### GET /api/v1/sessions
+
+列出用户的所有会话（需要JWT认证）
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "sessions": [...],
+    "total": 5,
+    "page": 1,
+    "page_size": 10
+  },
+  "request_id": "01JKX..."
+}
+```
+
+#### POST /api/v1/session/heartbeat
+
+发送会话心跳（需要JWT认证）
+
+**请求体**:
+```json
+{
+  "session_id": "01JKX..."
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "success": true,
+    "server_timestamp": "2026-01-15T12:00:00Z",
+    "remaining_seconds": 3540
+  },
+  "request_id": "01JKX..."
+}
+```
+
+#### DELETE /api/v1/session
+
+删除会话（需要JWT认证）
+
+**查询参数**:
+- `session_id`: 会话ID
+
+### StateSync API
+
+#### POST /api/v1/document
+
+创建文档（需要JWT认证）
+
+**请求体**:
+```json
+{
+  "name": "My Document",
+  "type": "whiteboard",
+  "content": "...",
+  "tags": ["project-a", "draft"],
+  "metadata": {
+    "project": "ProjectA"
+  }
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "id": "doc-123",
+    "name": "My Document",
+    "type": "whiteboard",
+    "state": "active",
+    "version": 1,
+    ...
+  },
+  "request_id": "01JKX..."
+}
+```
+
+#### GET /api/v1/document
+
+获取文档（需要JWT认证）
+
+**查询参数**:
+- `doc_id`: 文档ID
+
+#### GET /api/v1/documents
+
+列出文档（需要JWT认证）
+
+#### POST /api/v1/document/operation
+
+应用操作到文档（需要JWT认证）
+
+**请求体**:
+```json
+{
+  "doc_id": "doc-123",
+  "type": "update",
+  "data": "..."
+}
+```
+
+#### GET /api/v1/document/operations
+
+获取文档操作历史（需要JWT认证）
+
+**查询参数**:
+- `doc_id`: 文档ID
+
+#### POST /api/v1/document/lock
+
+获取文档锁（需要JWT认证）
+
+**请求体**:
+```json
+{
+  "doc_id": "doc-123",
+  "session_id": "session-456"
+}
+```
+
+#### DELETE /api/v1/document/lock
+
+释放文档锁（需要JWT认证）
+
+**请求体**:
+```json
+{
+  "doc_id": "doc-123"
+}
+```
+
+#### GET /api/v1/stats
+
+获取StateSync统计信息（需要JWT认证）
 
 ### WebSocket端点
 
@@ -468,6 +707,40 @@ RateLimit:
 - ⚠️ 生产环境必须修改JWT.Secret为强随机字符串
 - ⚠️ 建议使用环境变量而不是配置文件存储密钥
 - ⚠️ 定期轮换JWT密钥
+
+### gRPC配置
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| GRPC.Session.Target | string | 127.0.0.1:9001 | Session服务地址 |
+| GRPC.Session.Timeout | int | 5000 | 请求超时时间（毫秒） |
+| GRPC.Session.MaxRetries | int | 3 | 最大重试次数 |
+| GRPC.StateSync.Target | string | 127.0.0.1:9002 | StateSync服务地址 |
+| GRPC.StateSync.Timeout | int | 5000 | 请求超时时间（毫秒） |
+| GRPC.StateSync.MaxRetries | int | 3 | 最大重试次数 |
+| GRPC.Pool.MaxIdle | int | 10 | 最大空闲连接数 |
+| GRPC.Pool.MaxActive | int | 100 | 最大活跃连接数 |
+| GRPC.Pool.IdleTimeout | int | 60 | 空闲超时（秒） |
+| GRPC.LoadBalancer.Policy | string | round_robin | 负载均衡策略 |
+
+**配置示例**:
+```yaml
+GRPC:
+  Session:
+    Target: "127.0.0.1:9001"
+    Timeout: 5000
+    MaxRetries: 3
+  StateSync:
+    Target: "127.0.0.1:9002"
+    Timeout: 5000
+    MaxRetries: 3
+  Pool:
+    MaxIdle: 10
+    MaxActive: 100
+    IdleTimeout: 60
+  LoadBalancer:
+    Policy: "round_robin"
+```
 
 ## 响应格式
 
@@ -788,6 +1061,22 @@ Log:
 
 ## 版本历史
 
+### v0.5.0-alpha (2026-02-02)
+
+**新增**:
+- ✅ gRPC客户端集成
+- ✅ 连接池管理
+- ✅ Session API (5个端点)
+- ✅ StateSync API (8个端点)
+- ✅ HTTP到gRPC桥接
+- ✅ 自动重试机制
+- ✅ 32个单元测试
+
+**改进**:
+- 完善API文档
+- 优化错误处理
+- 提升代码覆盖率
+
 ### v0.4.0-alpha (2026-01-15)
 
 **新增**:
@@ -812,8 +1101,9 @@ Log:
 - ✅ 限流功能
 
 **下一步计划**:
-- gRPC客户端集成
-- 服务发现
+- gRPC over Quantum Dialer
+- Etcd服务发现
+- 熔断器与降级
 
 ## 相关文档
 

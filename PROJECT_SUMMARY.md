@@ -322,7 +322,7 @@ README.md               ~600      完整文档
 总计                    ~3790     行代码+文档
 ```
 
-### 🟡 部分完成 (Phase 2.3 - API Gateway, 75%)
+### 🟡 部分完成 (Phase 2.3 - API Gateway, 90%)
 
 **文件**: `internal/gateway/`, `cmd/gateway/`
 
@@ -445,10 +445,71 @@ JWT:
 - ✅ 84.6% 测试覆盖率
 - ✅ 测试场景完整 (生成/验证/刷新/过期/错误密钥等)
 
-#### 2.3.8 待实现功能 (0%)
-- ❌ gRPC客户端集成 (Session/StateSync)
+#### 2.3.8 gRPC客户端集成 (✅ 已完成)
+**文件**: `internal/gateway/grpcclient/`, `handler/session.go`, `handler/statesync.go`
+
+**gRPC客户端管理器** (`grpcclient/manager.go`, ~220行):
+- ✅ 连接池管理 (ConnectionPool)
+- ✅ Get/Put连接机制
+- ✅ 空闲连接清理
+- ✅ 连接状态检查
+- ✅ Manager统一管理
+- ✅ 统计信息
+
+**Session服务客户端** (`grpcclient/session.go`, ~200行):
+- ✅ CreateSession - 创建会话
+- ✅ GetSession - 获取会话
+- ✅ UpdateSession - 更新会话
+- ✅ DeleteSession - 删除会话
+- ✅ ListSessions - 列出会话
+- ✅ Heartbeat - 心跳保活
+- ✅ 自动重试机制
+- ✅ 超时控制
+
+**StateSync服务客户端** (`grpcclient/statesync.go`, ~320行):
+- ✅ CreateDocument - 创建文档
+- ✅ GetDocument - 获取文档
+- ✅ UpdateDocument - 更新文档
+- ✅ DeleteDocument - 删除文档
+- ✅ ListDocuments - 列出文档
+- ✅ ApplyOperation - 应用操作
+- ✅ GetOperationHistory - 操作历史
+- ✅ SubscribeDocument - 订阅文档（流式RPC）
+- ✅ AcquireLock / ReleaseLock - 锁管理
+- ✅ GetStats - 统计信息
+
+**HTTP到gRPC桥接** (`handler/session.go`, `handler/statesync.go`, ~400行):
+- ✅ Session API - 5个端点
+- ✅ StateSync API - 8个端点
+- ✅ JWT认证集成
+- ✅ 统一响应格式
+- ✅ 错误处理
+
+**连接池配置** (configs/gateway.yaml):
+```yaml
+GRPC:
+  Session:
+    Target: "127.0.0.1:9001"
+    Timeout: 5000
+    MaxRetries: 3
+  StateSync:
+    Target: "127.0.0.1:9002"
+    Timeout: 5000
+    MaxRetries: 3
+  Pool:
+    MaxIdle: 10
+    MaxActive: 100
+    IdleTimeout: 60
+```
+
+**单元测试** (`grpcclient/manager_test.go`, ~120行):
+- ✅ 5个测试用例
+- ✅ 连接池基础功能
+- ✅ 管理器操作
+- ✅ 统计信息
+
+#### 2.3.9 待实现功能 (0%)
 - ❌ gRPC over Quantum自定义Dialer
-- ❌ 客户端连接池管理
 - ❌ Etcd服务发现
 - ❌ 熔断器
 - ❌ 链路追踪 (Jaeger/Zipkin)
@@ -506,16 +567,17 @@ StateSync Manager       1       ~550       ~380       良好
 StateSync Conflict      1       ~250       0          -
 StateSync Broadcast     1       ~400       0          -
 StateSync Proto         1       ~230       0          -
-Gateway Config          1       ~110       0          -
-Gateway Handler         5       ~390       0          -
+Gateway Config          1       ~130       0          -
+Gateway Handler         7       ~800       0          -
 Gateway Middleware      5       ~300       0          -
-Gateway Service         1       ~50        0          -
+Gateway Service         1       ~110       0          -
 Gateway Main            1       ~70        0          -
 Gateway WebSocket       5       ~900       ~320       44.3%
 Gateway JWT             1       ~180       ~230       84.6%
-Gateway Docs            1       ~800       0          -
+Gateway gRPC Client     3       ~740       ~120       -
+Gateway Docs            1       ~1000      0          -
 ----------------------------------------------------------------
-总计                   47      ~10695     ~2800       平均 ~65%
+总计                   52      ~13230     ~3470       平均 ~67%
 ```
 
 ## 性能目标 vs 当前状态
@@ -605,12 +667,11 @@ GET  /ping                 - 心跳
 GET  /version              - 版本信息
 ```
 
-**下一步** (剩余25%):
-- gRPC客户端集成 (Session/StateSync)
+**下一步** (剩余10%):
 - Quantum协议Dialer
 - 服务发现与负载均衡
 
-#### 3. 微服务集成与Quantum Dialer (1-2 周) - 接下来开发
+#### 3. Quantum协议Dialer与服务发现 (1-2 周) - 接下来开发
 **目录**: `cmd/api-gateway/` + `internal/gateway/`
 
 **核心功能**:

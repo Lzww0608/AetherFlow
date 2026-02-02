@@ -68,6 +68,87 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		rest.WithJwt(svcCtx.Config.JWT.Secret),
 	)
 
+	// Session API（需要JWT认证）
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  "POST",
+				Path:    "/session",
+				Handler: CreateSessionHandler(svcCtx),
+			},
+			{
+				Method:  "GET",
+				Path:    "/session",
+				Handler: GetSessionHandler(svcCtx),
+			},
+			{
+				Method:  "GET",
+				Path:    "/sessions",
+				Handler: ListSessionsHandler(svcCtx),
+			},
+			{
+				Method:  "POST",
+				Path:    "/session/heartbeat",
+				Handler: SessionHeartbeatHandler(svcCtx),
+			},
+			{
+				Method:  "DELETE",
+				Path:    "/session",
+				Handler: DeleteSessionHandler(svcCtx),
+			},
+		},
+		rest.WithPrefix("/api/v1"),
+		rest.WithJwt(svcCtx.Config.JWT.Secret),
+	)
+
+	// StateSync API（需要JWT认证）
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  "POST",
+				Path:    "/document",
+				Handler: CreateDocumentHandler(svcCtx),
+			},
+			{
+				Method:  "GET",
+				Path:    "/document",
+				Handler: GetDocumentHandler(svcCtx),
+			},
+			{
+				Method:  "GET",
+				Path:    "/documents",
+				Handler: ListDocumentsHandler(svcCtx),
+			},
+			{
+				Method:  "POST",
+				Path:    "/document/operation",
+				Handler: ApplyOperationHandler(svcCtx),
+			},
+			{
+				Method:  "GET",
+				Path:    "/document/operations",
+				Handler: GetOperationHistoryHandler(svcCtx),
+			},
+			{
+				Method:  "POST",
+				Path:    "/document/lock",
+				Handler: AcquireLockHandler(svcCtx),
+			},
+			{
+				Method:  "DELETE",
+				Path:    "/document/lock",
+				Handler: ReleaseLockHandler(svcCtx),
+			},
+			{
+				Method:  "GET",
+				Path:    "/stats",
+				Handler: GetStatsHandler(svcCtx),
+			},
+		},
+		rest.WithPrefix("/api/v1"),
+		rest.WithJwt(svcCtx.Config.JWT.Secret),
+	)
+
 	// Session相关路由 (将来实现)
 	server.AddRoutes(
 		[]rest.Route{

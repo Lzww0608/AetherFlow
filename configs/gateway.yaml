@@ -93,3 +93,24 @@ JWT:
   Expire: 86400      # 24小时 (秒)
   RefreshExpire: 604800  # 7天 (秒)
   Issuer: "aetherflow"
+
+# gRPC服务端点配置
+GRPC:
+  # Session服务
+  Session:
+    Target: "127.0.0.1:9001"
+    Timeout: 5000      # 毫秒
+    MaxRetries: 3
+  # StateSync服务
+  StateSync:
+    Target: "127.0.0.1:9002"
+    Timeout: 5000      # 毫秒
+    MaxRetries: 3
+  # 连接池配置
+  Pool:
+    MaxIdle: 10        # 最大空闲连接数
+    MaxActive: 100     # 最大活跃连接数
+    IdleTimeout: 60    # 空闲超时(秒)
+  # 负载均衡配置
+  LoadBalancer:
+    Policy: "round_robin"  # round_robin, random, consistent_hash

@@ -30,6 +30,9 @@ type Config struct {
 	
 	// JWT配置
 	JWT JWTConfig `json:",optional"`
+	
+	// gRPC配置
+	GRPC GRPCConfig `json:",optional"`
 }
 
 // LogConfig 日志配置
@@ -88,8 +91,35 @@ type HealthConfig struct {
 
 // JWTConfig JWT配置
 type JWTConfig struct {
-	Secret     string `json:",default=aetherflow-secret-key"` // JWT密钥
-	Expire     int64  `json:",default=86400"`                  // 过期时间（秒，默认24小时）
-	RefreshExpire int64 `json:",default=604800"`               // 刷新令牌过期时间（秒，默认7天）
-	Issuer     string `json:",default=aetherflow"`            // 签发者
+	Secret        string `json:",default=aetherflow-secret-key"` // JWT密钥
+	Expire        int64  `json:",default=86400"`                  // 过期时间（秒，默认24小时）
+	RefreshExpire int64  `json:",default=604800"`                 // 刷新令牌过期时间（秒，默认7天）
+	Issuer        string `json:",default=aetherflow"`             // 签发者
+}
+
+// GRPCConfig gRPC配置
+type GRPCConfig struct {
+	Session      ServiceEndpoint    `json:",optional"`
+	StateSync    ServiceEndpoint    `json:",optional"`
+	Pool         PoolConfig         `json:",optional"`
+	LoadBalancer LoadBalancerConfig `json:",optional"`
+}
+
+// ServiceEndpoint 服务端点配置
+type ServiceEndpoint struct {
+	Target     string `json:",default=127.0.0.1:9001"` // 服务地址
+	Timeout    int    `json:",default=5000"`            // 超时时间（毫秒）
+	MaxRetries int    `json:",default=3"`               // 最大重试次数
+}
+
+// PoolConfig 连接池配置
+type PoolConfig struct {
+	MaxIdle     int `json:",default=10"`  // 最大空闲连接数
+	MaxActive   int `json:",default=100"` // 最大活跃连接数
+	IdleTimeout int `json:",default=60"`  // 空闲超时（秒）
+}
+
+// LoadBalancerConfig 负载均衡配置
+type LoadBalancerConfig struct {
+	Policy string `json:",default=round_robin"` // 负载均衡策略
 }
