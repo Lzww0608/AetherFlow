@@ -18,6 +18,7 @@ type ConnectionPool struct {
 	maxIdle     int
 	maxActive   int
 	idleTimeout time.Duration
+	dialOptions []grpc.DialOption
 	
 	mu          sync.Mutex
 	connections []*grpc.ClientConn
@@ -26,12 +27,13 @@ type ConnectionPool struct {
 }
 
 // NewConnectionPool 创建连接池
-func NewConnectionPool(target string, maxIdle, maxActive int, idleTimeout time.Duration, logger *zap.Logger) *ConnectionPool {
+func NewConnectionPool(target string, maxIdle, maxActive int, idleTimeout time.Duration, dialOptions []grpc.DialOption, logger *zap.Logger) *ConnectionPool {
 	return &ConnectionPool{
 		target:      target,
 		maxIdle:     maxIdle,
 		maxActive:   maxActive,
 		idleTimeout: idleTimeout,
+		dialOptions: dialOptions,
 		connections: make([]*grpc.ClientConn, 0, maxIdle),
 		logger:      logger,
 	}
@@ -95,13 +97,17 @@ func (p *ConnectionPool) Put(conn *grpc.ClientConn) {
 
 // createConnection 创建新的gRPC连接
 func (p *ConnectionPool) createConnection(ctx context.Context) (*grpc.ClientConn, error) {
-	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithKeepaliveParams(keepalive.ClientParameters{
-			Time:                10 * time.Second,
-			Timeout:             3 * time.Second,
-			PermitWithoutStream: true,
-		}),
+	opts := p.dialOptions
+	if len(opts) == 0 {
+		// 默认使用TCP
+		opts = []grpc.DialOption{
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithKeepaliveParams(keepalive.ClientParameters{
+				Time:                10 * time.Second,
+				Timeout:             3 * time.Second,
+				PermitWithoutStream: true,
+			}),
+		}
 	}
 
 	conn, err := grpc.DialContext(ctx, p.target, opts...)
@@ -164,16 +170,22 @@ func NewManager(logger *zap.Logger) *Manager {
 }
 
 // RegisterPool 注册连接池
-func (m *Manager) RegisterPool(name, target string, maxIdle, maxActive int, idleTimeout time.Duration) {
+func (m *Manager) RegisterPool(name, target string, maxIdle, maxActive int, idleTimeout time.Duration, dialOptions ...grpc.DialOption) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	pool := NewConnectionPool(target, maxIdle, maxActive, idleTimeout, m.logger)
+	pool := NewConnectionPool(target, maxIdle, maxActive, idleTimeout, dialOptions, m.logger)
 	m.pools[name] = pool
+
+	transportType := "TCP"
+	if len(dialOptions) > 0 {
+		transportType = "Quantum"
+	}
 
 	m.logger.Info("Registered gRPC connection pool",
 		zap.String("name", name),
 		zap.String("target", target),
+		zap.String("transport", transportType),
 		zap.Int("max_idle", maxIdle),
 		zap.Int("max_active", maxActive),
 	)

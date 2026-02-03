@@ -101,11 +101,13 @@ GRPC:
     Target: "127.0.0.1:9001"
     Timeout: 5000      # 毫秒
     MaxRetries: 3
+    Transport: "quantum"  # tcp 或 quantum
   # StateSync服务
   StateSync:
     Target: "127.0.0.1:9002"
     Timeout: 5000      # 毫秒
     MaxRetries: 3
+    Transport: "quantum"  # tcp 或 quantum
   # 连接池配置
   Pool:
     MaxIdle: 10        # 最大空闲连接数

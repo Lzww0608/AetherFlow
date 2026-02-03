@@ -107,9 +107,10 @@ type GRPCConfig struct {
 
 // ServiceEndpoint 服务端点配置
 type ServiceEndpoint struct {
-	Target     string `json:",default=127.0.0.1:9001"` // 服务地址
-	Timeout    int    `json:",default=5000"`            // 超时时间（毫秒）
-	MaxRetries int    `json:",default=3"`               // 最大重试次数
+	Target    string `json:",default=127.0.0.1:9001"`     // 服务地址
+	Timeout   int    `json:",default=5000"`                // 超时时间（毫秒）
+	MaxRetries int   `json:",default=3"`                   // 最大重试次数
+	Transport string `json:",default=tcp,options=tcp|quantum"` // 传输协议 (tcp/quantum)
 }
 
 // PoolConfig 连接池配置

@@ -92,7 +92,7 @@ func TestManager_Close(t *testing.T) {
 
 func TestConnectionPool_Stats(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
-	pool := NewConnectionPool("127.0.0.1:9000", 5, 10, 30*time.Second, logger)
+	pool := NewConnectionPool("127.0.0.1:9000", 5, 10, 30*time.Second, nil, logger)
 
 	stats := pool.Stats()
 

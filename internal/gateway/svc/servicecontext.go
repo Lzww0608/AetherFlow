@@ -45,22 +45,29 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	// 创建gRPC客户端管理器
 	grpcManager := grpcclient.NewManager(logger)
 	
+	// 创建Quantum Dialer（如果需要）
+	quantumDialer := grpcclient.NewQuantumDialer(logger)
+	
 	// 注册Session服务连接池
+	sessionDialOpts := grpcclient.GetDialOptions(c.GRPC.Session.Transport, quantumDialer)
 	grpcManager.RegisterPool(
 		"session",
 		c.GRPC.Session.Target,
 		c.GRPC.Pool.MaxIdle,
 		c.GRPC.Pool.MaxActive,
 		time.Duration(c.GRPC.Pool.IdleTimeout)*time.Second,
+		sessionDialOpts...,
 	)
 	
 	// 注册StateSync服务连接池
+	stateSyncDialOpts := grpcclient.GetDialOptions(c.GRPC.StateSync.Transport, quantumDialer)
 	grpcManager.RegisterPool(
 		"statesync",
 		c.GRPC.StateSync.Target,
 		c.GRPC.Pool.MaxIdle,
 		c.GRPC.Pool.MaxActive,
 		time.Duration(c.GRPC.Pool.IdleTimeout)*time.Second,
+		stateSyncDialOpts...,
 	)
 
 	// 创建Session客户端
