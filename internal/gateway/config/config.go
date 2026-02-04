@@ -59,8 +59,14 @@ type CorsConfig struct {
 
 // EtcdConfig Etcd配置
 type EtcdConfig struct {
-	Hosts []string `json:",optional"`
-	Key   string   `json:",default=aetherflow/services"`
+	Enable      bool     `json:",default=false"`                      // 是否启用Etcd
+	Endpoints   []string `json:",default=[127.0.0.1:2379]"`           // Etcd endpoints
+	DialTimeout int      `json:",default=5"`                          // 连接超时（秒）
+	Username    string   `json:",optional"`                           // 用户名
+	Password    string   `json:",optional"`                           // 密码
+	ServiceTTL  int64    `json:",default=10"`                         // 服务注册TTL（秒）
+	ServiceName string   `json:",default=aetherflow-gateway"`         // 服务名称
+	ServiceAddr string   `json:",default=localhost:8888"`             // 服务地址
 }
 
 // ServiceConfig 服务配置
@@ -107,10 +113,12 @@ type GRPCConfig struct {
 
 // ServiceEndpoint 服务端点配置
 type ServiceEndpoint struct {
-	Target    string `json:",default=127.0.0.1:9001"`     // 服务地址
-	Timeout   int    `json:",default=5000"`                // 超时时间（毫秒）
-	MaxRetries int   `json:",default=3"`                   // 最大重试次数
-	Transport string `json:",default=tcp,options=tcp|quantum"` // 传输协议 (tcp/quantum)
+	Target         string `json:",default=127.0.0.1:9001"`              // 服务地址（静态）
+	Timeout        int    `json:",default=5000"`                         // 超时时间（毫秒）
+	MaxRetries     int    `json:",default=3"`                            // 最大重试次数
+	Transport      string `json:",default=tcp,options=tcp|quantum"`      // 传输协议 (tcp/quantum)
+	UseDiscovery   bool   `json:",default=false"`                        // 是否使用服务发现
+	DiscoveryName  string `json:",optional"`                             // 服务发现名称
 }
 
 // PoolConfig 连接池配置

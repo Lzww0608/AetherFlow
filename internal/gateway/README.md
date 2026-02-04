@@ -135,9 +135,49 @@ StateSync:
   Transport: "tcp"      # 使用TCP协议
 ```
 
+#### 9. Etcd服务发现 ⭐ (新增)
+- ✅ **Etcd客户端** (`discovery/etcd.go`) - Etcd客户端封装
+- ✅ **服务注册** - TTL租约 + 自动心跳
+- ✅ **服务发现** - Watch机制实时监听
+- ✅ **动态更新** - 连接池地址自动更新
+- ✅ **健康检测** - 断线自动重连
+- ✅ **单元测试** - 8个测试用例
+
+**服务发现特性**:
+```
+注册机制:
+- TTL租约 (默认10s)
+- Keep-Alive心跳保活
+- 断线自动重注册
+- 优雅注销
+
+发现机制:
+- Watch实时监听
+- 初始地址加载
+- 增量更新推送
+- 多实例支持
+
+动态更新:
+- 连接池地址更新
+- 轮询负载均衡
+- 无缝切换节点
+- 零停机部署
+
+配置示例:
+Etcd:
+  Enable: true
+  Endpoints: ["127.0.0.1:2379"]
+  ServiceTTL: 10
+  
+GRPC:
+  Session:
+    UseDiscovery: true     # 启用服务发现
+    DiscoveryName: "session"
+```
+
 ### 🚧 待实现
 
-- ⏳ Etcd服务发现
+- ⏳ 熔断器与降级
 - ⏳ Session Service集成
 - ⏳ StateSync Service集成
 - ⏳ Etcd服务发现
@@ -753,6 +793,12 @@ RateLimit:
 | GRPC.Pool.MaxActive | int | 100 | 最大活跃连接数 |
 | GRPC.Pool.IdleTimeout | int | 60 | 空闲超时（秒） |
 | GRPC.LoadBalancer.Policy | string | round_robin | 负载均衡策略 |
+| Etcd.Enable | bool | false | 是否启用Etcd服务发现 |
+| Etcd.Endpoints | []string | ["127.0.0.1:2379"] | Etcd endpoints |
+| Etcd.DialTimeout | int | 5 | 连接超时（秒） |
+| Etcd.ServiceTTL | int64 | 10 | 服务注册TTL（秒） |
+| Etcd.ServiceName | string | aetherflow-gateway | 服务名称 |
+| Etcd.ServiceAddr | string | localhost:8888 | 服务地址 |
 
 **配置示例**:
 ```yaml
@@ -1092,6 +1138,22 @@ Log:
 
 ## 版本历史
 
+### v0.7.0-alpha (2026-02-03)
+
+**新增**:
+- ✅ Etcd服务发现
+- ✅ 服务注册与注销
+- ✅ 动态地址更新
+- ✅ Watch机制监听
+- ✅ 自动重连
+- ✅ 44个单元测试
+
+**改进**:
+- 支持动态扩缩容
+- 零停机部署
+- 服务健康检测
+- 完善配置文档
+
 ### v0.6.0-alpha (2026-02-02)
 
 **新增**:
@@ -1146,9 +1208,9 @@ Log:
 - ✅ 限流功能
 
 **下一步计划**:
-- Etcd服务发现
-- Prometheus监控
-- 熔断器与降级
+- Prometheus监控与指标
+- 熔断器与降级策略
+- 链路追踪集成
 
 ## 相关文档
 

@@ -39,11 +39,17 @@ Cors:
   AllowCredentials: true
   MaxAge: 3600
 
-# 服务发现配置
+# Etcd服务发现配置
 Etcd:
-  Hosts:
-    - 127.0.0.1:2379
-  Key: aetherflow/services
+  Enable: false               # 是否启用服务发现
+  Endpoints:
+    - "127.0.0.1:2379"       # Etcd endpoints
+  DialTimeout: 5             # 连接超时（秒）
+  Username: ""               # 用户名（可选）
+  Password: ""               # 密码（可选）
+  ServiceTTL: 10             # 服务注册TTL（秒）
+  ServiceName: "aetherflow-gateway"
+  ServiceAddr: "localhost:8888"
   
 # Session Service配置
 SessionService:
@@ -102,12 +108,16 @@ GRPC:
     Timeout: 5000      # 毫秒
     MaxRetries: 3
     Transport: "quantum"  # tcp 或 quantum
+    UseDiscovery: false   # 是否使用服务发现
+    DiscoveryName: "session"  # 服务发现名称
   # StateSync服务
   StateSync:
     Target: "127.0.0.1:9002"
     Timeout: 5000      # 毫秒
     MaxRetries: 3
     Transport: "quantum"  # tcp 或 quantum
+    UseDiscovery: false   # 是否使用服务发现
+    DiscoveryName: "statesync"  # 服务发现名称
   # 连接池配置
   Pool:
     MaxIdle: 10        # 最大空闲连接数

@@ -24,6 +24,10 @@ type ConnectionPool struct {
 	connections []*grpc.ClientConn
 	active      int
 	logger      *zap.Logger
+	
+	// 动态地址支持
+	dynamicAddresses []string
+	addressIndex     int
 }
 
 // NewConnectionPool 创建连接池
@@ -110,12 +114,66 @@ func (p *ConnectionPool) createConnection(ctx context.Context) (*grpc.ClientConn
 		}
 	}
 
-	conn, err := grpc.DialContext(ctx, p.target, opts...)
+	// 使用GetTarget获取目标地址（支持动态地址轮询）
+	target := p.GetTarget()
+	
+	conn, err := grpc.DialContext(ctx, target, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial %s: %w", p.target, err)
+		return nil, fmt.Errorf("failed to dial %s: %w", target, err)
 	}
 
 	return conn, nil
+}
+
+// UpdateAddresses 更新动态地址列表
+func (p *ConnectionPool) UpdateAddresses(addresses []string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if len(addresses) == 0 {
+		p.logger.Warn("No addresses provided for update")
+		return
+	}
+
+	p.dynamicAddresses = make([]string, len(addresses))
+	copy(p.dynamicAddresses, addresses)
+	p.addressIndex = 0
+
+	p.logger.Info("Addresses updated",
+		zap.Strings("addresses", addresses),
+	)
+
+	// 关闭现有连接，下次Get时会使用新地址
+	p.closeAllConnections()
+}
+
+// GetTarget 获取当前目标地址（支持轮询）
+func (p *ConnectionPool) GetTarget() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// 如果有动态地址，使用轮询
+	if len(p.dynamicAddresses) > 0 {
+		target := p.dynamicAddresses[p.addressIndex]
+		p.addressIndex = (p.addressIndex + 1) % len(p.dynamicAddresses)
+		return target
+	}
+
+	// 否则使用静态target
+	return p.target
+}
+
+// closeAllConnections 关闭所有连接（内部调用，需持有锁）
+func (p *ConnectionPool) closeAllConnections() {
+	for _, conn := range p.connections {
+		if err := conn.Close(); err != nil {
+			p.logger.Warn("Failed to close connection", zap.Error(err))
+		}
+	}
+	p.connections = p.connections[:0]
+	p.active = 0
+
+	p.logger.Info("All connections closed")
 }
 
 // Close 关闭连接池
@@ -189,6 +247,14 @@ func (m *Manager) RegisterPool(name, target string, maxIdle, maxActive int, idle
 		zap.Int("max_idle", maxIdle),
 		zap.Int("max_active", maxActive),
 	)
+}
+
+// GetPool 获取连接池
+func (m *Manager) GetPool(name string) *ConnectionPool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
+	return m.pools[name]
 }
 
 // GetConnection 获取连接
