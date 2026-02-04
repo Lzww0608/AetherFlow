@@ -85,7 +85,11 @@ RateLimit:
 # 熔断配置
 Breaker:
   Enable: true
-  Threshold: 0.5  # 错误率阈值
+  Threshold: 0.5           # 错误率阈值
+  MinRequests: 5           # 最小请求数
+  ConsecutiveFailures: 5   # 连续失败阈值
+  Timeout: 60              # 熔断超时（秒）
+  HalfOpenRequests: 3      # 半开状态最大请求数
 
 # 健康检查配置
 Health:

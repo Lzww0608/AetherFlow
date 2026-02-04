@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aetherflow/aetherflow/internal/gateway/breaker"
 	"github.com/aetherflow/aetherflow/internal/gateway/config"
 	"github.com/aetherflow/aetherflow/internal/gateway/discovery"
 	"github.com/aetherflow/aetherflow/internal/gateway/grpcclient"
@@ -27,6 +28,9 @@ type ServiceContext struct {
 	// 服务发现
 	EtcdClient      *discovery.EtcdClient
 	ServiceResolver *discovery.ServiceResolver
+	
+	// 熔断器
+	BreakerManager  *breaker.Manager
 }
 
 // NewServiceContext 创建服务上下文
@@ -81,6 +85,16 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		logger.Info("Etcd service discovery initialized",
 			zap.Strings("endpoints", c.Etcd.Endpoints),
 			zap.String("service", c.Etcd.ServiceName),
+		)
+	}
+	
+	// 创建熔断器管理器
+	var breakerManager *breaker.Manager
+	if c.Breaker.Enable {
+		breakerManager = breaker.NewManager(logger)
+		logger.Info("Circuit breaker enabled",
+			zap.Float64("threshold", c.Breaker.Threshold),
+			zap.Uint32("min_requests", c.Breaker.MinRequests),
 		)
 	}
 	
@@ -171,6 +185,22 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		logger,
 	)
 	
+	// 如果启用熔断，包装Session客户端
+	if breakerManager != nil {
+		sessionBreakerConfig := breaker.Config{
+			MaxRequests: c.Breaker.HalfOpenRequests,
+			Interval:    10 * time.Second,
+			Timeout:     time.Duration(c.Breaker.Timeout) * time.Second,
+			ReadyToTrip: func(counts breaker.Counts) bool {
+				return counts.Requests >= c.Breaker.MinRequests && 
+					(counts.ErrorRate() >= c.Breaker.Threshold || 
+					 counts.ConsecutiveFailures >= c.Breaker.ConsecutiveFailures)
+			},
+		}
+		sessionBreaker := breakerManager.GetOrCreate("session", sessionBreakerConfig)
+		_ = sessionBreaker // 熔断器已注册，可以在handler中使用
+	}
+	
 	// 创建StateSync客户端
 	stateSyncClient := grpcclient.NewStateSyncClient(
 		grpcManager,
@@ -179,6 +209,22 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		c.GRPC.StateSync.MaxRetries,
 		logger,
 	)
+	
+	// 如果启用熔断，包装StateSync客户端
+	if breakerManager != nil {
+		stateSyncBreakerConfig := breaker.Config{
+			MaxRequests: c.Breaker.HalfOpenRequests,
+			Interval:    10 * time.Second,
+			Timeout:     time.Duration(c.Breaker.Timeout) * time.Second,
+			ReadyToTrip: func(counts breaker.Counts) bool {
+				return counts.Requests >= c.Breaker.MinRequests && 
+					(counts.ErrorRate() >= c.Breaker.Threshold || 
+					 counts.ConsecutiveFailures >= c.Breaker.ConsecutiveFailures)
+			},
+		}
+		stateSyncBreaker := breakerManager.GetOrCreate("statesync", stateSyncBreakerConfig)
+		_ = stateSyncBreaker // 熔断器已注册，可以在handler中使用
+	}
 
 	return &ServiceContext{
 		Config:          c,
@@ -190,6 +236,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		StateSyncClient: stateSyncClient,
 		EtcdClient:      etcdClient,
 		ServiceResolver: serviceResolver,
+		BreakerManager:  breakerManager,
 	}
 }
 

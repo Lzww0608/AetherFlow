@@ -84,8 +84,12 @@ type RateLimitConfig struct {
 
 // BreakerConfig 熔断配置
 type BreakerConfig struct {
-	Enable    bool    `json:",default=true"`
-	Threshold float64 `json:",default=0.5"` // 错误率阈值
+	Enable           bool   `json:",default=true"`               // 是否启用熔断
+	Threshold        float64 `json:",default=0.5"`                // 错误率阈值
+	MinRequests      uint32  `json:",default=5"`                  // 最小请求数
+	ConsecutiveFailures uint32 `json:",default=5"`               // 连续失败阈值
+	Timeout          int     `json:",default=60"`                 // 熔断超时（秒）
+	HalfOpenRequests uint32  `json:",default=3"`                  // 半开状态最大请求数
 }
 
 // HealthConfig 健康检查配置
