@@ -52,6 +52,7 @@ func main() {
 	// 注册全局中间件
 	server.Use(middleware.RequestIDMiddleware)
 	server.Use(middleware.LoggerMiddleware(ctx))
+	server.Use(middleware.MetricsMiddleware(ctx.Metrics))
 	
 	// 可选：链路追踪中间件
 	if c.Tracing.Enable {

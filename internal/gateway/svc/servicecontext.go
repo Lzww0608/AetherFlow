@@ -10,6 +10,7 @@ import (
 	"github.com/aetherflow/aetherflow/internal/gateway/discovery"
 	"github.com/aetherflow/aetherflow/internal/gateway/grpcclient"
 	"github.com/aetherflow/aetherflow/internal/gateway/jwt"
+	"github.com/aetherflow/aetherflow/internal/gateway/metrics"
 	"github.com/aetherflow/aetherflow/internal/gateway/tracing"
 	"github.com/aetherflow/aetherflow/internal/gateway/websocket"
 	"go.uber.org/zap"
@@ -22,6 +23,8 @@ type ServiceContext struct {
 	WSServer        *websocket.Server
 	JWTManager      *jwt.JWTManager
 	Tracer          *tracing.Tracer
+	Metrics         *metrics.Metrics
+	MetricsCollector *metrics.Collector
 	
 	// gRPC客户端
 	GRPCManager     *grpcclient.Manager
@@ -71,6 +74,12 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		logger.Error("Failed to create tracer", zap.Error(err))
 		panic(fmt.Sprintf("Tracing initialization failed: %v", err))
 	}
+	
+	// 创建指标收集器
+	metricsCollector := metrics.NewMetrics("aetherflow", "gateway")
+	collector := metrics.NewCollector(metricsCollector, logger)
+	collector.Start()
+	logger.Info("Metrics collector started")
 
 	// 初始化Etcd和服务发现（如果启用）
 	var etcdClient *discovery.EtcdClient
@@ -249,22 +258,29 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 
 	return &ServiceContext{
-		Config:          c,
-		Logger:          logger,
-		WSServer:        wsServer,
-		JWTManager:      jwtManager,
-		Tracer:          tracer,
-		GRPCManager:     grpcManager,
-		SessionClient:   sessionClient,
-		StateSyncClient: stateSyncClient,
-		EtcdClient:      etcdClient,
-		ServiceResolver: serviceResolver,
-		BreakerManager:  breakerManager,
+		Config:           c,
+		Logger:           logger,
+		WSServer:         wsServer,
+		JWTManager:       jwtManager,
+		Tracer:           tracer,
+		Metrics:          metricsCollector,
+		MetricsCollector: collector,
+		GRPCManager:      grpcManager,
+		SessionClient:    sessionClient,
+		StateSyncClient:  stateSyncClient,
+		EtcdClient:       etcdClient,
+		ServiceResolver:  serviceResolver,
+		BreakerManager:   breakerManager,
 	}
 }
 
 // Close 关闭服务上下文
 func (ctx *ServiceContext) Close() {
+	// 关闭指标收集器
+	if ctx.MetricsCollector != nil {
+		ctx.MetricsCollector.Stop()
+	}
+	
 	// 关闭链路追踪器
 	if ctx.Tracer != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

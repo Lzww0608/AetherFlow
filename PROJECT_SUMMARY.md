@@ -766,9 +766,113 @@ Tracing:
 - ✅ 最佳实践
 - ✅ 故障排查
 
-#### 2.3.13 待实现功能 (0%)
-- ❌ Prometheus指标增强
-- ❌ 压力测试
+#### 2.3.13 Prometheus 指标增强 (✅ 已完成)
+**文件**: `internal/gateway/metrics/`
+
+**指标模块** (`metrics.go`, ~450行):
+- ✅ HTTP 请求指标 - 请求总数、延迟、大小、活跃请求
+- ✅ gRPC 请求指标 - 请求总数、延迟、流消息、活跃流
+- ✅ WebSocket 指标 - 连接总数、活跃连接、消息统计
+- ✅ 业务指标 - 会话、文档、操作、冲突统计
+- ✅ 系统指标 - 错误、Panic、Goroutine 数量
+- ✅ 熔断器指标 - 状态、跳闸统计
+- ✅ 缓存指标 - 命中率、驱逐统计
+- ✅ 链路追踪指标 - Trace、Span 统计
+
+**指标收集器** (`collector.go`, ~80行):
+- ✅ 自动收集系统指标
+- ✅ 后台定时收集
+- ✅ Goroutine 数量监控
+- ✅ 内存统计收集
+
+**指标中间件** (`middleware/metrics.go`, ~65行):
+- ✅ HTTP 请求自动记录
+- ✅ 延迟分布统计
+- ✅ 请求/响应大小统计
+- ✅ 活跃请求计数
+
+**核心特性**:
+```
+指标类型:
+- Counter: 单调递增计数器
+- Gauge: 可增可减的测量值
+- Histogram: 延迟和大小分布
+
+标签维度:
+- HTTP: method, path, status_code
+- gRPC: service, method, status
+- WebSocket: type, direction
+- 业务: action, type, resolution
+
+性能优化:
+- 使用 promauto 自动注册
+- 合适的 Histogram bucket
+- 低基数标签设计
+```
+
+**Grafana 仪表盘** (configs/grafana/dashboard-gateway.json):
+- ✅ HTTP 请求速率面板
+- ✅ HTTP 延迟百分位数面板
+- ✅ 活跃连接数面板
+- ✅ gRPC 请求统计面板
+- ✅ WebSocket 连接统计面板
+- ✅ 错误率面板
+- ✅ 系统资源面板
+- ✅ 熔断器状态面板
+- ✅ 缓存性能面板
+
+**文档** (docs/METRICS_GUIDE.md, ~400行):
+- ✅ 完整的指标列表
+- ✅ Prometheus 查询示例
+- ✅ 告警规则配置
+- ✅ 最佳实践
+- ✅ 故障排查
+
+#### 2.3.14 压力测试 (✅ 已完成)
+**文件**: `tools/stress-test/`
+
+**压力测试工具** (`main.go`, ~400行):
+- ✅ 自定义并发数
+- ✅ 可配置持续时间
+- ✅ RPS 限制支持
+- ✅ HTTP keep-alive
+- ✅ 请求超时控制
+- ✅ 实时统计
+
+**测试脚本** (`scripts/stress-test.sh`, ~150行):
+- ✅ 8种预定义测试场景
+- ✅ 自动编译工具
+- ✅ Gateway 健康检查
+- ✅ 彩色输出
+
+**测试场景**:
+```
+1. basic      - 基础负载 (10并发, 30秒)
+2. medium     - 中等负载 (50并发, 1分钟)
+3. heavy      - 高负载 (100并发, 2分钟)
+4. spike      - 峰值测试 (200并发, 30秒)
+5. sustained  - 持续测试 (50并发, 5分钟)
+6. ratelimit  - 限流测试 (20并发, 1000 RPS)
+7. auth       - 认证端点 (30并发, 1分钟)
+8. websocket  - WebSocket 连接测试
+```
+
+**统计指标**:
+- ✅ 请求总数统计
+- ✅ 成功/失败率
+- ✅ 延迟分布 (Min/Max/Avg/P50/P95/P99)
+- ✅ 吞吐量 (req/s)
+- ✅ 状态码分布
+- ✅ 错误类型统计
+
+**文档** (docs/STRESS_TEST_GUIDE.md, ~550行):
+- ✅ 快速开始指南
+- ✅ 测试场景说明
+- ✅ 参数详细说明
+- ✅ 结果分析指南
+- ✅ 性能优化建议
+- ✅ 故障排查
+- ✅ CI/CD 集成示例
 
 ### ❌ 未完成 (Phase 3.2 - 完整部署集成, 0%)
 
@@ -824,7 +928,7 @@ StateSync Broadcast     1       ~400       0          -
 StateSync Proto         1       ~230       0          -
 Gateway Config          1       ~150       0          -
 Gateway Handler         8       ~900       0          -
-Gateway Middleware      6       ~390       0          -
+Gateway Middleware      7       ~455       0          -
 Gateway Service         1       ~220       0          -
 Gateway Main            1       ~70        0          -
 Gateway WebSocket       5       ~900       ~320       44.3%
@@ -833,9 +937,12 @@ Gateway gRPC Client     6       ~1230      ~180       -
 Gateway Discovery       2       ~530       ~160       -
 Gateway Breaker         3       ~670       ~290       -
 Gateway Tracing         2       ~360       ~200       73.3%
-Gateway Docs            3       ~3100      0          -
+Gateway Metrics         2       ~530       0          -
+Gateway Docs            5       ~4050      0          -
+Stress Test Tool        1       ~400       0          -
+Scripts                 2       ~280       0          -
 ----------------------------------------------------------------
-总计                   64      ~17970     ~4580       平均 ~72%
+总计                   69      ~19485     ~4580       平均 ~72%
 ```
 
 ## 性能目标 vs 当前状态

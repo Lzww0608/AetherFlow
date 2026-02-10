@@ -1,0 +1,136 @@
+{
+  "dashboard": {
+    "title": "AetherFlow API Gateway",
+    "tags": ["aetherflow", "gateway"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "HTTP Requests Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(aetherflow_gateway_http_requests_total[1m])",
+            "legendFormat": "{{method}} {{path}} - {{status_code}}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "id": 2,
+        "title": "HTTP Request Duration (P95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(aetherflow_gateway_http_request_duration_seconds_bucket[1m]))",
+            "legendFormat": "{{method}} {{path}}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "id": 3,
+        "title": "Active HTTP Requests",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "aetherflow_gateway_http_active_requests",
+            "legendFormat": "{{method}} {{path}}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}
+      },
+      {
+        "id": 4,
+        "title": "gRPC Requests Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(aetherflow_gateway_grpc_requests_total[1m])",
+            "legendFormat": "{{service}} {{method}} - {{status}}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}
+      },
+      {
+        "id": 5,
+        "title": "WebSocket Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "aetherflow_gateway_websocket_active_connections",
+            "legendFormat": "Active Connections"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8}
+      },
+      {
+        "id": 6,
+        "title": "Active Sessions & Documents",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "aetherflow_gateway_active_sessions",
+            "legendFormat": "Active Sessions"
+          },
+          {
+            "expr": "aetherflow_gateway_active_documents",
+            "legendFormat": "Active Documents"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8}
+      },
+      {
+        "id": 7,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(aetherflow_gateway_errors_total[1m])",
+            "legendFormat": "{{type}} - {{code}}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8}
+      },
+      {
+        "id": 8,
+        "title": "Goroutines",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "aetherflow_gateway_goroutines",
+            "legendFormat": "Goroutines"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8}
+      },
+      {
+        "id": 9,
+        "title": "Circuit Breaker State",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "aetherflow_gateway_circuit_breaker_state",
+            "legendFormat": "{{name}}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 32, "w": 12, "h": 8}
+      },
+      {
+        "id": 10,
+        "title": "Cache Hit Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(aetherflow_gateway_cache_hits_total[1m]) / (rate(aetherflow_gateway_cache_hits_total[1m]) + rate(aetherflow_gateway_cache_misses_total[1m]))",
+            "legendFormat": "{{cache}}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 32, "w": 12, "h": 8}
+      }
+    ],
+    "refresh": "10s",
+    "schemaVersion": 16,
+    "version": 1
+  }
+}
