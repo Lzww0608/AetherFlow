@@ -8,7 +8,7 @@
 - **⚡ 超低延迟**: P99 < 50ms端到端延迟，专为实时协作优化
 - **🏗️ 微服务架构**: 基于GoZero的云原生微服务，高可扩展性
 - **☁️ 云原生**: 完整的Kubernetes部署，etcd服务发现，HPA自动伸缩
-- **📊 可观测性**: Prometheus + Grafana + 结构化日志
+- **📊 可观测性**: Prometheus + Grafana + Jaeger链路追踪 + 结构化日志
 
 ## 📖 文档
 
@@ -48,6 +48,36 @@ go run main.go
 cd examples/session
 go run main.go
 ```
+
+### 链路追踪快速开始
+
+```bash
+# 1. 启动 Jaeger
+docker run -d --name jaeger \
+  -p 16686:16686 -p 14268:14268 \
+  jaegertracing/all-in-one:latest
+
+# 2. 配置 Gateway (configs/gateway.yaml)
+#    Tracing:
+#      Enable: true
+#      Exporter: jaeger
+#      SampleRate: 1.0
+
+# 3. 启动 Gateway
+cd cmd/gateway
+go run main.go -f ../../configs/gateway.yaml
+
+# 4. 测试追踪
+./scripts/test-tracing.sh
+
+# 5. 查看 Jaeger UI
+# 访问: http://localhost:16686
+```
+
+**详细文档**: 
+- [链路追踪完整文档](internal/gateway/tracing/README.md)
+- [快速开始指南](docs/TRACING_QUICK_START.md)
+- [使用示例](examples/tracing/README.md)
 
 ## 📊 项目进度
 

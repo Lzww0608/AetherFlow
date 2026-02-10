@@ -63,12 +63,16 @@ StateSyncService:
     - 127.0.0.1:50052
   Timeout: 5000  # 5秒
 
-# Telemetry配置
-Telemetry:
-  Name: aetherflow-gateway
-  Endpoint: http://localhost:14268/api/traces
-  Sampler: 1.0
-  Batcher: jaeger
+# 链路追踪配置
+Tracing:
+  Enable: false                             # 是否启用追踪
+  ServiceName: aetherflow-gateway           # 服务名称
+  Endpoint: http://localhost:14268/api/traces  # Jaeger endpoint (或 Zipkin: http://localhost:9411/api/v2/spans)
+  Exporter: jaeger                          # 导出器类型: jaeger 或 zipkin
+  SampleRate: 1.0                           # 采样率 (0.0-1.0, 1.0=100%)
+  Environment: development                   # 环境: development, staging, production
+  BatchTimeout: 5                            # 批量发送超时（秒）
+  MaxQueueSize: 2048                         # 最大队列大小
 
 # Prometheus配置
 Prometheus:

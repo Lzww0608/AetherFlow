@@ -1,6 +1,7 @@
 package svc
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/aetherflow/aetherflow/internal/gateway/discovery"
 	"github.com/aetherflow/aetherflow/internal/gateway/grpcclient"
 	"github.com/aetherflow/aetherflow/internal/gateway/jwt"
+	"github.com/aetherflow/aetherflow/internal/gateway/tracing"
 	"github.com/aetherflow/aetherflow/internal/gateway/websocket"
 	"go.uber.org/zap"
 )
@@ -19,6 +21,7 @@ type ServiceContext struct {
 	Logger          *zap.Logger
 	WSServer        *websocket.Server
 	JWTManager      *jwt.JWTManager
+	Tracer          *tracing.Tracer
 	
 	// gRPC客户端
 	GRPCManager     *grpcclient.Manager
@@ -51,6 +54,23 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		c.JWT.RefreshExpire,
 		c.JWT.Issuer,
 	)
+	
+	// 创建链路追踪器
+	tracingConfig := &tracing.Config{
+		Enable:       c.Tracing.Enable,
+		ServiceName:  c.Tracing.ServiceName,
+		Endpoint:     c.Tracing.Endpoint,
+		Exporter:     c.Tracing.Exporter,
+		SampleRate:   c.Tracing.SampleRate,
+		Environment:  c.Tracing.Environment,
+		BatchTimeout: c.Tracing.BatchTimeout,
+		MaxQueueSize: c.Tracing.MaxQueueSize,
+	}
+	tracer, err := tracing.NewTracer(tracingConfig, logger)
+	if err != nil {
+		logger.Error("Failed to create tracer", zap.Error(err))
+		panic(fmt.Sprintf("Tracing initialization failed: %v", err))
+	}
 
 	// 初始化Etcd和服务发现（如果启用）
 	var etcdClient *discovery.EtcdClient
@@ -104,8 +124,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	// 创建Quantum Dialer（如果需要）
 	quantumDialer := grpcclient.NewQuantumDialer(logger)
 	
-	// 注册Session服务连接池
+	// 注册Session服务连接池（添加追踪拦截器）
 	sessionDialOpts := grpcclient.GetDialOptions(c.GRPC.Session.Transport, quantumDialer)
+	sessionDialOpts = append(sessionDialOpts, grpcclient.GetTracingDialOptions(tracer)...)
 	grpcManager.RegisterPool(
 		"session",
 		c.GRPC.Session.Target,
@@ -140,8 +161,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		}
 	}
 	
-	// 注册StateSync服务连接池
+	// 注册StateSync服务连接池（添加追踪拦截器）
 	stateSyncDialOpts := grpcclient.GetDialOptions(c.GRPC.StateSync.Transport, quantumDialer)
+	stateSyncDialOpts = append(stateSyncDialOpts, grpcclient.GetTracingDialOptions(tracer)...)
 	grpcManager.RegisterPool(
 		"statesync",
 		c.GRPC.StateSync.Target,
@@ -231,6 +253,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Logger:          logger,
 		WSServer:        wsServer,
 		JWTManager:      jwtManager,
+		Tracer:          tracer,
 		GRPCManager:     grpcManager,
 		SessionClient:   sessionClient,
 		StateSyncClient: stateSyncClient,
@@ -242,6 +265,15 @@ func NewServiceContext(c config.Config) *ServiceContext {
 
 // Close 关闭服务上下文
 func (ctx *ServiceContext) Close() {
+	// 关闭链路追踪器
+	if ctx.Tracer != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := ctx.Tracer.Shutdown(shutdownCtx); err != nil {
+			ctx.Logger.Error("Failed to shutdown tracer", zap.Error(err))
+		}
+	}
+	
 	// 关闭Etcd客户端（先注销服务）
 	if ctx.EtcdClient != nil {
 		if err := ctx.EtcdClient.Unregister(); err != nil {

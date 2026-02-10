@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Jaeger All-in-One（包含 UI、Collector、Query、Agent）
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: aetherflow-jaeger
+    ports:
+      - "5775:5775/udp"     # agent accept zipkin.thrift over compact thrift protocol
+      - "6831:6831/udp"     # agent accept jaeger.thrift over compact thrift protocol
+      - "6832:6832/udp"     # agent accept jaeger.thrift over binary thrift protocol
+      - "5778:5778"         # agent serve configs
+      - "16686:16686"       # UI
+      - "14268:14268"       # collector accept jaeger.thrift directly from clients
+      - "14250:14250"       # collector accept model.proto
+      - "9411:9411"         # collector Zipkin compatible endpoint
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - aetherflow-network
+
+  # Zipkin（可选，与 Jaeger 二选一）
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: aetherflow-zipkin
+    ports:
+      - "9412:9411"         # Zipkin UI 和 API (使用不同端口避免与 Jaeger 冲突)
+    environment:
+      - STORAGE_TYPE=mem
+    networks:
+      - aetherflow-network
+    profiles:
+      - zipkin
+
+  # AetherFlow Gateway
+  gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: aetherflow-gateway
+    ports:
+      - "8080:8080"         # HTTP API
+      - "9091:9091"         # Prometheus Metrics
+    volumes:
+      - ../configs/gateway.yaml:/app/configs/gateway.yaml
+    environment:
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - TRACING_ENABLE=true
+      - TRACING_SAMPLE_RATE=1.0
+    depends_on:
+      - jaeger
+    networks:
+      - aetherflow-network
+    profiles:
+      - app
+
+networks:
+  aetherflow-network:
+    driver: bridge

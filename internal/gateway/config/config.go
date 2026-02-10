@@ -33,6 +33,9 @@ type Config struct {
 	
 	// gRPC配置
 	GRPC GRPCConfig `json:",optional"`
+	
+	// 链路追踪配置
+	Tracing TracingConfig `json:",optional"`
 }
 
 // LogConfig 日志配置
@@ -135,4 +138,16 @@ type PoolConfig struct {
 // LoadBalancerConfig 负载均衡配置
 type LoadBalancerConfig struct {
 	Policy string `json:",default=round_robin"` // 负载均衡策略
+}
+
+// TracingConfig 链路追踪配置
+type TracingConfig struct {
+	Enable       bool    `json:",default=false"`                              // 是否启用追踪
+	ServiceName  string  `json:",default=aetherflow-gateway"`                 // 服务名称
+	Endpoint     string  `json:",default=http://localhost:14268/api/traces"`  // Jaeger endpoint
+	Exporter     string  `json:",default=jaeger,options=jaeger|zipkin"`       // 导出器类型
+	SampleRate   float64 `json:",default=1.0"`                                // 采样率 (0.0-1.0)
+	Environment  string  `json:",default=development"`                         // 环境
+	BatchTimeout int     `json:",default=5"`                                  // 批量发送超时（秒）
+	MaxQueueSize int     `json:",default=2048"`                               // 最大队列大小
 }

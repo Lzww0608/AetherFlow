@@ -683,8 +683,90 @@ Breaker:
 - ✅ 半开状态测试
 - ✅ 重置功能测试
 
-#### 2.3.12 待实现功能 (0%)
-- ❌ 链路追踪 (Jaeger/Zipkin)
+#### 2.3.12 链路追踪 (✅ 已完成)
+**文件**: `internal/gateway/tracing/`
+
+**链路追踪核心** (`tracer.go`, ~280行):
+- ✅ Tracer - 追踪器管理
+- ✅ OpenTelemetry 集成
+- ✅ 多导出器支持 - Jaeger/Zipkin
+- ✅ 可配置采样 - AlwaysSample/NeverSample/TraceIDRatioBased
+- ✅ 上下文传播 - W3C Trace Context + Baggage
+- ✅ 批量处理器 - 减少网络开销
+- ✅ 资源标签 - ServiceName/Environment
+
+**追踪中间件** (`middleware/tracing.go`, ~90行):
+- ✅ TracingMiddleware - HTTP 请求追踪
+- ✅ 自动提取/注入追踪上下文
+- ✅ 记录请求信息 - Method/URL/Headers
+- ✅ 记录响应信息 - StatusCode/Size
+- ✅ 错误追踪 - 4xx/5xx 自动标记
+- ✅ ResponseRecorder - 捕获响应数据
+
+**gRPC 追踪拦截器** (`grpcclient/tracing_interceptor.go`, ~180行):
+- ✅ UnaryClientTracingInterceptor - 一元调用追踪
+- ✅ StreamClientTracingInterceptor - 流式调用追踪
+- ✅ 上下文传播 - gRPC metadata
+- ✅ 服务和方法提取
+- ✅ 错误状态记录
+- ✅ tracingClientStream - 流式追踪包装器
+
+**核心特性**:
+```
+追踪能力:
+- HTTP 请求自动追踪
+- gRPC 调用自动追踪（一元+流式）
+- 跨服务上下文传播
+- 父子 Span 关系维护
+
+采样策略:
+- 全采样 (SampleRate=1.0)
+- 不采样 (SampleRate=0.0)
+- 比例采样 (SampleRate=0.1)
+- 基于 TraceID 哈希
+
+导出器:
+- Jaeger (HTTP)
+- Zipkin (HTTP)
+- 可扩展其他后端
+
+性能优化:
+- 批量发送 (BatchTimeout)
+- 队列缓存 (MaxQueueSize)
+- 异步处理
+- 优雅关闭
+```
+
+**配置支持** (configs/gateway.yaml):
+```yaml
+Tracing:
+  Enable: true
+  ServiceName: aetherflow-gateway
+  Endpoint: http://localhost:14268/api/traces
+  Exporter: jaeger
+  SampleRate: 1.0
+  Environment: development
+  BatchTimeout: 5
+  MaxQueueSize: 2048
+```
+
+**单元测试** (`tracer_test.go`, ~200行):
+- ✅ 10个测试用例
+- ✅ Tracer 创建测试
+- ✅ 导出器测试 (Jaeger/Zipkin)
+- ✅ 采样率测试
+- ✅ 注入/提取测试
+- ✅ Carrier 测试
+
+**文档** (`tracing/README.md`, ~500行):
+- ✅ 完整的使用指南
+- ✅ 配置说明
+- ✅ 部署指南 (Jaeger/Zipkin)
+- ✅ 代码示例
+- ✅ 最佳实践
+- ✅ 故障排查
+
+#### 2.3.13 待实现功能 (0%)
 - ❌ Prometheus指标增强
 - ❌ 压力测试
 
@@ -742,17 +824,18 @@ StateSync Broadcast     1       ~400       0          -
 StateSync Proto         1       ~230       0          -
 Gateway Config          1       ~150       0          -
 Gateway Handler         8       ~900       0          -
-Gateway Middleware      5       ~300       0          -
+Gateway Middleware      6       ~390       0          -
 Gateway Service         1       ~220       0          -
 Gateway Main            1       ~70        0          -
 Gateway WebSocket       5       ~900       ~320       44.3%
 Gateway JWT             1       ~180       ~230       84.6%
-Gateway gRPC Client     5       ~1050      ~180       -
+Gateway gRPC Client     6       ~1230      ~180       -
 Gateway Discovery       2       ~530       ~160       -
 Gateway Breaker         3       ~670       ~290       -
-Gateway Docs            1       ~1600      0          -
+Gateway Tracing         2       ~360       ~200       73.3%
+Gateway Docs            3       ~3100      0          -
 ----------------------------------------------------------------
-总计                   58      ~16570     ~4180       平均 ~70%
+总计                   64      ~17970     ~4580       平均 ~72%
 ```
 
 ## 性能目标 vs 当前状态
@@ -850,6 +933,7 @@ GET  /version              - 版本信息
 - Quantum Dialer ✅
 - Etcd服务发现 ✅
 - 熔断器与降级 ✅
+- 链路追踪 (Jaeger/Zipkin) ✅
 
 #### 3. 其他增强功能 (可选) - 后续优化
 **目录**: `cmd/api-gateway/` + `internal/gateway/`

@@ -38,6 +38,7 @@ func main() {
 
 	// 创建服务上下文
 	ctx := svc.NewServiceContext(c)
+	defer ctx.Close()
 
 	// 设置WebSocket JWT认证
 	ctx.WSServer.SetAuthFunc(func(token string) (userID, sessionID, username, email string, err error) {
@@ -51,6 +52,11 @@ func main() {
 	// 注册全局中间件
 	server.Use(middleware.RequestIDMiddleware)
 	server.Use(middleware.LoggerMiddleware(ctx))
+	
+	// 可选：链路追踪中间件
+	if c.Tracing.Enable {
+		server.Use(middleware.TracingMiddleware(ctx.Tracer))
+	}
 
 	// 可选：限流中间件
 	if c.RateLimit.Enable {
