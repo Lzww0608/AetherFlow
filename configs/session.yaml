@@ -1,0 +1,38 @@
+# Session Service Configuration
+
+Server:
+  Host: 0.0.0.0
+  Port: 9001
+
+Store:
+  Type: memory  # memory, redis
+  Redis:
+    Addr: localhost:6379
+    Password: ""
+    DB: 0
+    PoolSize: 10
+    MinIdleConns: 5
+    MaxRetries: 3
+    DialTimeout: 5s
+    ReadTimeout: 3s
+    WriteTimeout: 3s
+
+Log:
+  Level: info    # debug, info, warn, error
+  Format: json   # json, console
+
+Metrics:
+  Enable: true
+  Host: 0.0.0.0
+  Port: 9101
+  Path: /metrics
+
+Tracing:
+  Enable: false
+  ServiceName: session-service
+  Endpoint: http://localhost:14268/api/traces
+  Exporter: jaeger
+  SampleRate: 1.0
+  Environment: development
+  BatchTimeout: 5
+  MaxQueueSize: 2048

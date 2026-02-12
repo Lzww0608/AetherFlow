@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # Session Service
+  session-service:
+    image: golang:1.21-alpine
+    container_name: aetherflow-session-service
+    working_dir: /app
+    command: sh -c "go run cmd/session-service/main.go -f configs/session.yaml"
+    volumes:
+      - ..:/app
+    ports:
+      - "9001:9001"    # gRPC 端口
+      - "9101:9101"    # Metrics 端口
+    environment:
+      - GO111MODULE=on
+      - CGO_ENABLED=0
+    networks:
+      - aetherflow-network
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:9001"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # StateSync Service
+  statesync-service:
+    image: golang:1.21-alpine
+    container_name: aetherflow-statesync-service
+    working_dir: /app
+    command: sh -c "go run cmd/statesync-service/main.go -f configs/statesync.yaml"
+    volumes:
+      - ..:/app
+    ports:
+      - "9002:9002"    # gRPC 端口
+      - "9102:9102"    # Metrics 端口
+    environment:
+      - GO111MODULE=on
+      - CGO_ENABLED=0
+    networks:
+      - aetherflow-network
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:9002"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Gateway
+  gateway:
+    image: golang:1.21-alpine
+    container_name: aetherflow-gateway
+    working_dir: /app
+    command: sh -c "go run cmd/gateway/main.go"
+    volumes:
+      - ..:/app
+    ports:
+      - "8080:8080"    # HTTP 端口
+      - "8081:8081"    # Metrics 端口
+    environment:
+      - GO111MODULE=on
+      - CGO_ENABLED=0
+      - SESSION_SERVICE_ADDR=session-service:9001
+      - STATESYNC_SERVICE_ADDR=statesync-service:9002
+    networks:
+      - aetherflow-network
+    depends_on:
+      - session-service
+      - statesync-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aetherflow-prometheus
+    volumes:
+      - ../configs/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - aetherflow-network
+    depends_on:
+      - gateway
+      - session-service
+      - statesync-service
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aetherflow-grafana
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../configs/grafana:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - aetherflow-network
+    depends_on:
+      - prometheus
+
+networks:
+  aetherflow-network:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:

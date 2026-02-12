@@ -1,0 +1,42 @@
+# StateSync Service Configuration
+
+Server:
+  Host: 0.0.0.0
+  Port: 9002
+
+Store:
+  Type: memory  # memory, postgres
+  Postgres:
+    Host: localhost
+    Port: 5432
+    User: postgres
+    Password: postgres
+    DBName: aetherflow
+    SSLMode: disable
+    MaxOpenConns: 25
+    MaxIdleConns: 5
+
+Log:
+  Level: info    # debug, info, warn, error
+  Format: json   # json, console
+
+Metrics:
+  Enable: true
+  Host: 0.0.0.0
+  Port: 9102
+  Path: /metrics
+
+Tracing:
+  Enable: false
+  ServiceName: statesync-service
+  Endpoint: http://localhost:14268/api/traces
+  Exporter: jaeger
+  SampleRate: 1.0
+  Environment: development
+  BatchTimeout: 5
+  MaxQueueSize: 2048
+
+Manager:
+  LockTimeout: 30s
+  CleanupInterval: 5m
+  AutoResolveConflicts: true

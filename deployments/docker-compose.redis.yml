@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Redis - Session Store
+  redis:
+    image: redis:7-alpine
+    container_name: aetherflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - aetherflow-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # Session Service (with Redis)
+  session-service:
+    image: golang:1.21-alpine
+    container_name: aetherflow-session-service-redis
+    working_dir: /app
+    command: sh -c "go run cmd/session-service/main.go -f configs/session.yaml"
+    volumes:
+      - ..:/app
+    ports:
+      - "9001:9001"    # gRPC 端口
+      - "9101:9101"    # Metrics 端口
+    environment:
+      - GO111MODULE=on
+      - CGO_ENABLED=0
+    networks:
+      - aetherflow-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:9001"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # Redis Commander (Web UI for Redis)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: aetherflow-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - aetherflow-network
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+networks:
+  aetherflow-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
