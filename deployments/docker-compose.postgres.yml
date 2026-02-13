@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # PostgreSQL - StateSync Store
+  postgres:
+    image: postgres:15-alpine
+    container_name: aetherflow-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aetherflow
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    networks:
+      - aetherflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # StateSync Service (with PostgreSQL)
+  statesync-service:
+    image: golang:1.21-alpine
+    container_name: aetherflow-statesync-service-postgres
+    working_dir: /app
+    command: sh -c "go run cmd/statesync-service/main.go -f configs/statesync.yaml"
+    volumes:
+      - ..:/app
+    ports:
+      - "9002:9002"    # gRPC 端口
+      - "9102:9102"    # Metrics 端口
+    environment:
+      - GO111MODULE=on
+      - CGO_ENABLED=0
+    networks:
+      - aetherflow-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:9002"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  # pgAdmin (Web UI for PostgreSQL)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: aetherflow-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@aetherflow.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - aetherflow-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+networks:
+  aetherflow-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  pgadmin-data:
+    driver: local

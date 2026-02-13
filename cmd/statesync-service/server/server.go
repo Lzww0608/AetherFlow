@@ -2,14 +2,17 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	pb "github.com/aetherflow/aetherflow/api/proto/statesync"
 	"github.com/aetherflow/aetherflow/cmd/statesync-service/config"
 	"github.com/aetherflow/aetherflow/internal/gateway/tracing"
 	"github.com/aetherflow/aetherflow/internal/statesync"
+	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -39,9 +42,50 @@ func New(cfg *config.Config, logger *zap.Logger) (*Server, error) {
 		store = statesync.NewMemoryStore()
 		logger.Info("Using MemoryStore")
 	case "postgres":
-		// TODO: 实现 PostgresStore
-		logger.Warn("PostgresStore not implemented yet, falling back to MemoryStore")
-		store = statesync.NewMemoryStore()
+		// 创建 PostgreSQL 连接字符串
+		connStr := fmt.Sprintf(
+			"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+			cfg.Store.Postgres.Host,
+			cfg.Store.Postgres.Port,
+			cfg.Store.Postgres.User,
+			cfg.Store.Postgres.Password,
+			cfg.Store.Postgres.DBName,
+			cfg.Store.Postgres.SSLMode,
+		)
+		
+		// 打开数据库连接
+		db, err := sql.Open("postgres", connStr)
+		if err != nil {
+			logger.Error("Failed to open PostgreSQL connection", zap.Error(err))
+			return nil, fmt.Errorf("failed to open PostgreSQL: %w", err)
+		}
+		
+		// 配置连接池
+		db.SetMaxOpenConns(cfg.Store.Postgres.MaxOpenConns)
+		db.SetMaxIdleConns(cfg.Store.Postgres.MaxIdleConns)
+		db.SetConnMaxLifetime(5 * time.Minute)
+		
+		// 测试连接
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := db.PingContext(ctx); err != nil {
+			logger.Error("Failed to ping PostgreSQL", zap.Error(err))
+			return nil, fmt.Errorf("failed to ping PostgreSQL: %w", err)
+		}
+		
+		// 创建 PostgresStore
+		store, err = statesync.NewPostgresStore(&statesync.PostgresStoreConfig{
+			DB:     db,
+			Logger: logger,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create PostgresStore: %w", err)
+		}
+		
+		logger.Info("Using PostgresStore",
+			zap.String("host", cfg.Store.Postgres.Host),
+			zap.Int("port", cfg.Store.Postgres.Port),
+			zap.String("database", cfg.Store.Postgres.DBName))
 	default:
 		return nil, fmt.Errorf("unsupported store type: %s", cfg.Store.Type)
 	}
