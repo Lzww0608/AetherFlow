@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AetherFlow - 实时协作演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .panel-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-connected {
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        .status-disconnected {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Login Form */
+        .login-form {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .login-form input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .login-form input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+
+        /* Editor */
+        .editor-container {
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .editor-toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .editor-content {
+            flex: 1;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: none;
+            transition: border-color 0.2s;
+        }
+
+        .editor-content:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .editor-content:disabled {
+            background: #f9fafb;
+            cursor: not-allowed;
+        }
+
+        .editor-info {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #6b7280;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Users Panel */
+        .users-list {
+            list-style: none;
+        }
+
+        .user-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #f9fafb;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-right: 12px;
+        }
+
+        .user-name {
+            font-weight: 500;
+            color: #1f2937;
+        }
+
+        .user-status {
+            font-size: 12px;
+            color: #10b981;
+        }
+
+        /* Operations Panel */
+        .operations-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .operation-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+
+        .operation-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .operation-type {
+            font-weight: 600;
+            color: #667eea;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        .operation-time {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .operation-details {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .stat-card {
+            background: #f9fafb;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Lock Indicator */
+        .lock-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            background: #fef3c7;
+            color: #92400e;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .lock-indicator.unlocked {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .alert-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Loading */
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🚀 AetherFlow 实时协作演示</h1>
+            <p>基于 WebSocket 的低延迟实时文档编辑</p>
+        </div>
+
+        <!-- Login/Join -->
+        <div class="panel" id="loginPanel">
+            <div class="panel-title">
+                <span>👤 用户登录</span>
+                <span class="status-dot status-disconnected"></span>
+            </div>
+            
+            <div class="alert alert-info" id="connectionAlert">
+                请输入用户名并加入或创建文档
+            </div>
+
+            <div class="login-form">
+                <input type="text" id="usernameInput" placeholder="用户名 (例如: Alice)" />
+                <input type="text" id="documentInput" placeholder="文档 ID (留空创建新文档)" />
+                <button class="btn btn-primary" onclick="connect()">连接</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-grid" id="mainContent" style="display: none;">
+            <!-- Editor Panel -->
+            <div class="panel">
+                <div class="panel-title">
+                    <span>📝 文档编辑器</span>
+                    <div>
+                        <span class="lock-indicator unlocked" id="lockIndicator">🔓 未锁定</span>
+                        <button class="btn btn-secondary" onclick="toggleLock()" id="lockButton" style="margin-left: 8px;">锁定</button>
+                    </div>
+                </div>
+
+                <div class="editor-container">
+                    <div class="editor-toolbar">
+                        <button class="btn btn-secondary" onclick="insertText('Hello')">插入 Hello</button>
+                        <button class="btn btn-secondary" onclick="insertText('\n')">换行</button>
+                        <button class="btn btn-secondary" onclick="clearEditor()">清空</button>
+                    </div>
+
+                    <textarea class="editor-content" id="editor" placeholder="开始输入..."></textarea>
+
+                    <div class="editor-info">
+                        <span>文档 ID: <strong id="docIdDisplay">-</strong></span>
+                        <span>版本: <strong id="versionDisplay">0</strong></span>
+                        <span>字符数: <strong id="charCount">0</strong></span>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="operationCount">0</div>
+                        <div class="stat-label">操作次数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="latencyDisplay">-</div>
+                        <div class="stat-label">平均延迟(ms)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="conflictCount">0</div>
+                        <div class="stat-label">冲突次数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="syncCount">0</div>
+                        <div class="stat-label">同步次数</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Sidebar -->
+            <div>
+                <!-- Active Users -->
+                <div class="panel" style="margin-bottom: 20px;">
+                    <div class="panel-title">
+                        <span>👥 在线用户 (<span id="userCount">0</span>)</span>
+                    </div>
+                    <ul class="users-list" id="usersList">
+                        <!-- Users will be added here -->
+                    </ul>
+                </div>
+
+                <!-- Operations History -->
+                <div class="panel">
+                    <div class="panel-title">
+                        <span>📊 操作历史</span>
+                    </div>
+                    <div class="operations-list" id="operationsList">
+                        <!-- Operations will be added here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

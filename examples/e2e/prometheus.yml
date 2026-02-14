@@ -1,0 +1,33 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'aetherflow-e2e'
+    environment: 'demo'
+
+scrape_configs:
+  # Gateway Metrics
+  - job_name: 'gateway'
+    static_configs:
+      - targets: ['gateway:8100']
+        labels:
+          service: 'gateway'
+
+  # Session Service Metrics
+  - job_name: 'session-service'
+    static_configs:
+      - targets: ['session-service:9101']
+        labels:
+          service: 'session'
+
+  # StateSync Service Metrics
+  - job_name: 'statesync-service'
+    static_configs:
+      - targets: ['statesync-service:9102']
+        labels:
+          service: 'statesync'
+
+  # Prometheus Self Monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

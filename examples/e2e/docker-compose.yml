@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  # Redis - Session Store
+  redis:
+    image: redis:7-alpine
+    container_name: e2e-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - aetherflow-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # PostgreSQL - StateSync Store
+  postgres:
+    image: postgres:15-alpine
+    container_name: e2e-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aetherflow
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - aetherflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Jaeger - Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: e2e-jaeger
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: :9411
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # HTTP collector
+      - "14250:14250"  # gRPC collector
+      - "9411:9411"    # Zipkin compatible endpoint
+    networks:
+      - aetherflow-network
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: e2e-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - aetherflow-network
+    depends_on:
+      - gateway
+      - session-service
+      - statesync-service
+
+  # Session Service
+  session-service:
+    image: golang:1.21-alpine
+    container_name: e2e-session-service
+    working_dir: /app
+    command: sh -c "go mod download && go run cmd/session-service/main.go -f configs/session.yaml"
+    volumes:
+      - ../../:/app
+    ports:
+      - "9001:9001"  # gRPC
+      - "9101:9101"  # Metrics
+    environment:
+      - REDIS_ADDR=redis:6379
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+    networks:
+      - aetherflow-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+
+  # StateSync Service
+  statesync-service:
+    image: golang:1.21-alpine
+    container_name: e2e-statesync-service
+    working_dir: /app
+    command: sh -c "go mod download && go run cmd/statesync-service/main.go -f configs/statesync.yaml"
+    volumes:
+      - ../../:/app
+    ports:
+      - "9002:9002"  # gRPC
+      - "9102:9102"  # Metrics
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=aetherflow
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+    networks:
+      - aetherflow-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+
+  # API Gateway
+  gateway:
+    image: golang:1.21-alpine
+    container_name: e2e-gateway
+    working_dir: /app
+    command: sh -c "go mod download && go run cmd/gateway/main.go -f configs/gateway.yaml"
+    volumes:
+      - ../../:/app
+    ports:
+      - "8000:8000"  # HTTP/WebSocket
+      - "8100:8100"  # Metrics
+    environment:
+      - SESSION_SERVICE_ADDR=session-service:9001
+      - STATESYNC_SERVICE_ADDR=statesync-service:9002
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+    networks:
+      - aetherflow-network
+    depends_on:
+      - session-service
+      - statesync-service
+      - jaeger
+
+networks:
+  aetherflow-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  prometheus-data:
+    driver: local
