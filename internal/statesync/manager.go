@@ -600,6 +600,11 @@ func (m *Manager) cleanup() {
 	}
 }
 
+// GetStore 返回底层存储（用于特殊查询）
+func (m *Manager) GetStore() Store {
+	return m.store
+}
+
 // Close 关闭管理器
 func (m *Manager) Close() error {
 	m.mu.Lock()

@@ -9,8 +9,6 @@ import (
 	pb "github.com/aetherflow/aetherflow/api/proto/statesync"
 	"github.com/aetherflow/aetherflow/internal/statesync"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -37,7 +35,7 @@ func (s *Server) CreateDocument(ctx context.Context, req *pb.CreateDocumentReque
 	docType := statesync.DocumentType(req.Type)
 
 	// 创建文档
-	doc, err := s.manager.CreateDocument(ctx, req.Name, docType, req.CreatedBy, req.Content, protoMetadataToInternal(req.Metadata))
+	doc, err := s.manager.CreateDocument(ctx, req.Name, docType, req.CreatedBy, req.Content)
 	if err != nil {
 		s.logger.Error("Failed to create document", zap.Error(err))
 		return &pb.CreateDocumentResponse{
@@ -231,7 +229,7 @@ func (s *Server) ApplyOperation(ctx context.Context, req *pb.ApplyOperationReque
 	}
 
 	// 应用操作
-	appliedOp, err := s.manager.ApplyOperation(ctx, op)
+	err = s.manager.ApplyOperation(ctx, op)
 	if err != nil {
 		s.logger.Error("Failed to apply operation", zap.Error(err))
 		return &pb.ApplyOperationResponse{
@@ -241,7 +239,7 @@ func (s *Server) ApplyOperation(ctx context.Context, req *pb.ApplyOperationReque
 	}
 
 	// 转换为 proto
-	pbOp, err := operationToProto(appliedOp)
+	pbOp, err := operationToProto(op)
 	if err != nil {
 		return &pb.ApplyOperationResponse{
 			Success: false,
@@ -275,8 +273,8 @@ func (s *Server) GetOperationHistory(ctx context.Context, req *pb.GetOperationHi
 		Limit: int(req.Limit),
 	}
 
-	// 获取操作历史
-	ops, _, err := s.manager.GetOperations(ctx, filter)
+	// 获取操作历史  
+	ops, _, err := s.manager.GetStore().ListOperations(ctx, filter)
 	if err != nil {
 		s.logger.Error("Failed to get operation history", zap.Error(err))
 		return &pb.GetOperationHistoryResponse{
@@ -412,7 +410,7 @@ func (s *Server) IsLocked(ctx context.Context, req *pb.IsLockedRequest) (*pb.IsL
 	}
 
 	// 检查锁
-	lock, err := s.manager.IsLocked(ctx, docID)
+	locked, err := s.manager.IsLocked(ctx, docID)
 	if err != nil {
 		s.logger.Error("Failed to check lock", zap.Error(err))
 		return &pb.IsLockedResponse{
@@ -421,14 +419,22 @@ func (s *Server) IsLocked(ctx context.Context, req *pb.IsLockedRequest) (*pb.IsL
 		}, nil
 	}
 
-	if lock == nil {
+	if !locked {
 		return &pb.IsLockedResponse{
 			Locked: false,
 		}, nil
 	}
 
+	// 获取锁详情
+	lockInfo, err := s.manager.GetStore().GetLock(ctx, docID)
+	if err != nil || lockInfo == nil {
+		return &pb.IsLockedResponse{
+			Locked: true,
+		}, nil
+	}
+
 	// 转换为 proto
-	pbLock := lockToProto(lock)
+	pbLock := lockToProto(lockInfo)
 
 	return &pb.IsLockedResponse{
 		Locked: true,

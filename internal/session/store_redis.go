@@ -232,9 +232,9 @@ func (s *RedisStore) List(ctx context.Context, filter *SessionFilter) ([]*Sessio
 	var sessionIDs []string
 
 	// Get session IDs based on filter
-	if filter.UserID != nil && *filter.UserID != "" {
+	if filter.UserID != "" {
 		// Filter by user ID
-		userIndexKey := userIndexKeyPrefix + *filter.UserID
+		userIndexKey := userIndexKeyPrefix + filter.UserID
 		members, err := s.client.SMembers(ctx, userIndexKey).Result()
 		if err != nil && err != redis.Nil {
 			return nil, 0, fmt.Errorf("failed to get user sessions: %w", err)

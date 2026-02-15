@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"time"
 
 	guuid "github.com/Lzww0608/GUUID"
 	pb "github.com/aetherflow/aetherflow/api/proto/session"
@@ -176,7 +175,7 @@ func (s *Server) ListSessions(ctx context.Context, req *pb.ListSessionsRequest) 
 	// 构建过滤器
 	filter := &session.SessionFilter{
 		UserID: req.UserId,
-		Page:   int(req.Page),
+		Offset: int(req.Page * req.PageSize),
 		Limit:  int(req.PageSize),
 	}
 
